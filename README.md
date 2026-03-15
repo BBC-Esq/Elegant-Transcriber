@@ -4,12 +4,6 @@
 
 </div>
 
-<div align="center">
-
-### Requires [Python 3.10](https://www.python.org/downloads/release/python-31011/), [3.11](https://www.python.org/downloads/release/python-3119/), [3.12](https://www.python.org/downloads/release/python-31213/), or [3.13](https://www.python.org/downloads/release/python-31312/)
-
-</div>
-
 ## Features
 
 - Batch transcribe multiple files recursively in directories or sub-directories.
