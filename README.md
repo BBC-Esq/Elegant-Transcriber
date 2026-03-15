@@ -32,7 +32,7 @@ Transcription of a ~2.5 hour file [`sam_altman_lex_podcast_367.flac`](https://hu
 | [Granite Speech](https://github.com/ibm-granite/granite-speech) | [Granite 4.0 1B Speech](https://huggingface.co/ibm-granite/granite-speech-3.3-8b) | 12 | 30s | ~6.3 GB | 97.7s | #1 |
 
 > All models were run in ```bfloat16```.<br>
-> All VRAM measurements include model weights and inference overhead.<br>
+> All VRAM measurements include model weights and inference overhead and subtract background usage.<br>
 > All parameters were chosen to achieve a maximum throughput of ~90% CUDA core usage on an RTX 4090.
 
 ## Installation
