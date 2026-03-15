@@ -20,19 +20,18 @@
 
 ## Benchmarks
 
-Transcription of a 2.5 hour file [`sam_altman_lex_podcast_367.flac`](https://huggingface.co/datasets/reach-vb/random-audios/blob/main/sam_altman_lex_podcast_367.flac) on an RTX 4090 and 13900k CPU
+Transcription of a 2.5 hour file [`sam_altman_lex_podcast_367.flac`](https://huggingface.co/datasets/reach-vb/random-audios/blob/main/sam_altman_lex_podcast_367.flac) on an RTX 4090:
 
-| Library | Model | Device | Batch Size / Chunk Length | VRAM Usage | Time |
-|---|---|---|---|---|---|
-| **Elegant Transcriber** | **Parakeet TDT 0.6B v2** | **CUDA** | **90s chunks** | **~3.3 GB** | **8.2s** |
-| Transformers | Whisper Large v3 | CUDA | Batch 16 | ~8.2 GB | 54.6s |
-| WhisperS2T Reborn | Whisper Large v3 | CUDA | Batch 16 | ~8.8 GB | 69.4s |
-| Faster-Whisper | Whisper Large v3 | CUDA | Batch 16 | ~8.4 GB | 80.1s |
-| WhisperX | Whisper Large v3 | CUDA | Batch 16 | ~8.8 GB | 87.3s |
-| Granite Speech | Granite 4.0 1B Speech | CUDA | Batch 8 / 45s chunks | ~18.3 GB | 136.6s |
-| Elegant Transcriber | Parakeet TDT 0.6B v2 | CPU | 30s chunks | N/A | 281.7s |
+| Library | Model | Device | Batch | Chunk | VRAM Usage | Time |
+|---|---|---|---|---|---|---|
+| **Elegant Transcriber** | **Parakeet TDT 0.6B v2** | **CUDA** | 1 | **90s** | **~3.3 GB** | **8.2s** |
+| Transformers | Whisper Large v3 | CUDA | 16 | Auto | ~8.2 GB | 54.6s |
+| WhisperS2T Reborn | Whisper Large v3 | CUDA | 16 | Auto | ~8.8 GB | 69.4s |
+| Faster-Whisper | Whisper Large v3 | CUDA | 16 | Auto | ~8.4 GB | 80.1s |
+| WhisperX | Whisper Large v3 | CUDA | 16 | Auto | ~8.8 GB | 87.3s |
+| Granite Speech | Granite 4.0 1B Speech | CUDA | 8 | 45s | ~18.3 GB | 136.6s |
 
-> VRAM includes model weights plus inference overhead. All models run in bfloat16 except the CPU test was in float32.
+> VRAM includes model weights plus inference overhead.  Models were all run in bfloat16.
 
 ## Installation
 
