@@ -25,10 +25,10 @@ Transcription of a ~2.5 hour file [`sam_altman_lex_podcast_367.flac`](https://hu
 | Library | Model | Batch | Chunk | VRAM Usage | Time |
 |---|---|---|---|---|---|
 | **Elegant Transcriber** | **Parakeet TDT 0.6B v2** | 1 | **90s** | **~3.3 GB** | **8.2s** |
-| Transformers | Whisper Large v3 | 32 | Auto | ~9.0 GB | 52.2s |
-| WhisperS2T Reborn | Whisper Large v3 | 32 | Auto | ~9.2 GB | 66.9s |
-| Faster-Whisper | Whisper Large v3 | 32 | Auto | ~8.4 GB | 75.9s |
-| WhisperX | Whisper Large v3 | 32 | Auto | ~8.6 GB | 71.8s |
+| Transformers | Whisper Large v3 | 32 | Default | ~9.0 GB | 52.2s |
+| WhisperS2T Reborn | Whisper Large v3 | 32 | Default | ~9.2 GB | 66.9s |
+| Faster-Whisper | Whisper Large v3 | 32 | Default | ~8.4 GB | 75.9s |
+| WhisperX | Whisper Large v3 | 32 | Default | ~8.6 GB | 71.8s |
 | Granite Speech | Granite 4.0 1B Speech | 1 | 30s | ~18.3 GB | 136.6s |
 
 > VRAM includes model weights plus inference overhead.  Models were all run in bfloat16.<br>
