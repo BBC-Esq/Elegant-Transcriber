@@ -9,6 +9,7 @@
 - Optional timestamps with configurable segment intervals
 - Works on GPU (CUDA) and CPU, Windows or Linux
 - Supported file types: AAC, AMR, ASF, AVI, FLAC, M4A, MKV, MP3, MP4, WAV, WEBM, WMA
+- [Link to article on Medium](https://medium.com/@vici0549/the-best-audio-transcriber-period-3249fa92f531)
 
 ## Installation
 
