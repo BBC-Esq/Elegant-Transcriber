@@ -52,7 +52,7 @@ python install.py
 python main.py
 ```
 
-### 3. Linux (from wource)
+### 3. Linux (from source)
 
 > Download the latest release, unzip and extract, then navigate to the directory containing ```main.py``` and run:
 
