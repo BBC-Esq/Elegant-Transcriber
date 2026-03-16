@@ -60,6 +60,7 @@ python main.py
 | [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~12.5 GB | 75.9s | 114x | #32 |
 | [WhisperX](https://github.com/m-bain/whisperX) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~12.8 GB | 71.8s | 120x | #32 |
 | [Granite Speech](https://github.com/ibm-granite/granite-speech) | [Granite 4.0 1B Speech](https://huggingface.co/ibm-granite/granite-4.0-1b-speech) | 12 | 30s | ~6.3 GB | 97.7s | 88x | #1 |
+| **[Elegant Transcriber](https://github.com/BBC-Esq/Elegant-Audio-Transcriber)** | **[Canary-Qwen-2.5b](https://huggingface.co/nvidia/canary-qwen-2.5b)** | 1 | **40s** | **~11.1 GB** | **639.8ss** | 13.5x | #2 |
 
 > All models were run in ```bfloat16```.<br>
 > All VRAM measurements include model weights and inference overhead and subtract background usage.<br>
