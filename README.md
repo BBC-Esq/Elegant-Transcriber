@@ -80,3 +80,8 @@ python main.py
 > All models were loaded in ```float32``` for CPU compatibility.<br>
 > 20 threads were used on an Intel 13900k resulting in ~90% CPU usage.<br>
 > I couldn't get Granite Speech to run...
+
+## Special Thanks
+* Nvidia for the Canary and Parkeet models, which are the best balance of accuracy and compute time for commonfolk like myself.
+* IBM for Granite Speech Models, which, as of March, 2026, rank #1 on the ASR leaderboard in terms of accuracy.
+* OpenAI for the older Whisper models.
