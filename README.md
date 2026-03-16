@@ -13,8 +13,7 @@
 - Supported file types: AAC, AMR, ASF, AVI, FLAC, M4A, MKV, MP3, MP4, WAV, WEBM, WMA
 
 ## Benchmarks
-
-Transcription of a ~2.5 hour file [`sam_altman_lex_podcast_367.flac`](https://huggingface.co/datasets/reach-vb/random-audios/blob/main/sam_altman_lex_podcast_367.flac):
+* [`sam_altman_lex_podcast_367.flac`](https://huggingface.co/datasets/reach-vb/random-audios/blob/main/sam_altman_lex_podcast_367.flac)
 
 | Library | Model | Batch | Chunk | VRAM Usage | Time | [Quality Ranking](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard) |
 |---|---|---|---|---|---|---|
