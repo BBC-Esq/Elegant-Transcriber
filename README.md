@@ -80,5 +80,5 @@ python main.py
 | [WhisperX](https://github.com/m-bain/whisperX) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 1 | Default | ~7.3 GB | 396.4s | 1.96x | #32 |
 
 > All models were loaded in ```float32``` for CPU compatibility.<br>
-> 20 threads were used on an Intel 13900k resulting in ~90% CPU usage.
+> 20 threads were used on an Intel 13900k resulting in ~90% CPU usage.<br>
 > I couldn't get Granite Speech to run...
