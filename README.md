@@ -6,10 +6,10 @@
 
 ## Features
 
+- 4x faster than the fasted Whisper implementation
 - Batch transcribe multiple files recursively in directories or sub-directories.
-- NVIDIA Parakeet TDT 0.6B v2 (English) and v3 (Multilingual + Translation)
 - Optional timestamps with configurable segment intervals
-- GPU (CUDA) and CPU inference support
+- Works on GPU (CUDA) and CPU, Windows or Linux
 - Supported file types: AAC, AMR, ASF, AVI, FLAC, M4A, MKV, MP3, MP4, WAV, WEBM, WMA
 
 ## Installation
