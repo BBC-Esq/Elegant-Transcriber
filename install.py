@@ -96,13 +96,16 @@ app_libs = [
     "av",
     "psutil",
     "pyside6",
+    "peft>=0.18.0",
+    "soundfile",
 ]
 
 version_overrides = [
     "transformers>=5",
     "huggingface-hub>=1.3.0",
     "fsspec>=2024.12.0",
-    "protobuf>=6.33",
+    "protobuf>=6.33,<7",
+    "datasets>=3.2.0",
 ]
 
 
@@ -281,7 +284,7 @@ def main():
         print(f"\033[91mVersion overrides failed after {attempts_overrides} attempts.\033[0m")
         sys.exit(1)
 
-    print(f"\n\033[92mStep 4: Installing app libraries (av, psutil, pyside6):\033[0m")
+    print(f"\n\033[92mStep 4: Installing app libraries (av, psutil, pyside6, peft, soundfile):\033[0m")
     success_app, attempts_app = install_libraries(app_libs)
     if not success_app:
         print(f"\033[91mApp library installation failed after {attempts_app} attempts.\033[0m")

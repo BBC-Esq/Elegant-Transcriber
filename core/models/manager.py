@@ -7,7 +7,7 @@ from PySide6.QtCore import QObject, Signal, QMutex
 
 import torch
 
-from config.constants import PARAKEET_MODELS
+from config.constants import ALL_MODELS
 from download_model import find_local_model
 
 logger = logging.getLogger(__name__)
@@ -61,18 +61,25 @@ class ModelManager(QObject):
             self._model_mutex.unlock()
 
     def _load_model(self, config: Dict[str, Any]) -> Any:
-        model_info = PARAKEET_MODELS[config['model_key']]
+        model_info = ALL_MODELS[config['model_key']]
         model_id = model_info['model_id']
+        model_type = model_info.get('model_type', 'parakeet')
         device = config['device']
         precision = config['precision']
 
-        logger.info(f"Loading model: {model_id} on {device} with {precision}")
+        logger.info(f"Loading model: {model_id} ({model_type}) on {device} with {precision}")
 
         if device == "cpu" and precision in ("float16", "bfloat16"):
             torch_dtype = torch.float32
         else:
             torch_dtype = TORCH_DTYPE_MAP.get(precision, torch.float32)
 
+        if model_type == "canary":
+            return self._load_canary(model_id, device, torch_dtype)
+        else:
+            return self._load_parakeet(model_id, device, torch_dtype)
+
+    def _load_parakeet(self, model_id: str, device: str, torch_dtype) -> Any:
         logger.info("Importing NeMo ASR...")
         with contextlib.redirect_stdout(io.StringIO()), \
              contextlib.redirect_stderr(io.StringIO()):
@@ -113,7 +120,45 @@ class ModelManager(QObject):
         if hasattr(model, 'joint') and hasattr(model.joint, 'unfreeze'):
             model.joint.unfreeze = _noop
 
-        logger.info(f"Model loaded successfully on {device}")
+        logger.info(f"Parakeet model loaded successfully on {device}")
+        return model
+
+    def _load_canary(self, model_id: str, device: str, torch_dtype) -> Any:
+        logger.info("Importing NeMo SALM for Canary-Qwen...")
+        with contextlib.redirect_stdout(io.StringIO()), \
+             contextlib.redirect_stderr(io.StringIO()):
+            from nemo.collections.speechlm2.models import SALM
+
+        # Monkey-patch Qwen3 for transformers 5 compatibility
+        try:
+            from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM, Qwen3Model
+            if not hasattr(Qwen3ForCausalLM, '_patched_get_input_embeddings'):
+                Qwen3ForCausalLM._patched_get_input_embeddings = True
+                Qwen3ForCausalLM.get_input_embeddings = lambda self: getattr(self.model, 'embed_tokens', None)
+                Qwen3Model.get_input_embeddings = lambda self: getattr(self, 'embed_tokens', None)
+                logger.info("Applied Qwen3 get_input_embeddings monkey-patch")
+        except (ImportError, AttributeError):
+            pass
+
+        local_path = find_local_model(model_id)
+        stderr_capture = io.StringIO()
+
+        model_path = local_path if local_path else model_id
+        logger.info(f"Loading SALM from: {model_path}")
+        with contextlib.redirect_stdout(io.StringIO()), \
+             contextlib.redirect_stderr(stderr_capture):
+            model = SALM.from_pretrained(model_path)
+
+        captured = stderr_capture.getvalue()
+        if captured:
+            logger.info(f"Model load stderr: {captured[:500]}")
+
+        model = model.to(device)
+        if device == "cuda" and torch_dtype != torch.float32:
+            model = model.to(dtype=torch_dtype)
+        model.eval()
+
+        logger.info(f"Canary-Qwen model loaded successfully on {device}")
         return model
 
     def _release_current_model(self) -> None:

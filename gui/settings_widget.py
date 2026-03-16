@@ -6,9 +6,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QSettings
 
 from config.constants import (
-    MODEL_NAMES, MODEL_PRECISIONS, MODEL_TOOLTIPS,
+    MODEL_NAMES, MODEL_PRECISIONS, MODEL_TOOLTIPS, ALL_MODELS,
     DEFAULT_SEGMENT_LENGTH, DEFAULT_SEGMENT_DURATION,
     SUPPORTED_AUDIO_EXTENSIONS, TIMESTAMP_FORMATS,
+    CANARY_MAX_CHUNK_LENGTH,
 )
 from utils.system_utils import get_compute_and_platform_info, has_bfloat16_support
 
@@ -157,6 +158,7 @@ class SettingsWidget(QGroupBox):
 
     def _on_model_changed(self, model_name: str):
         self._update_precision_options()
+        self._update_model_constraints(model_name)
 
     def _on_timestamps_toggled(self, checked: bool):
         self.ts_format_combo.setEnabled(checked)
@@ -189,6 +191,29 @@ class SettingsWidget(QGroupBox):
         if previous in available:
             self.precision_combo.setCurrentText(previous)
         self.precision_combo.blockSignals(False)
+
+    def _get_model_type(self, model_name: str) -> str:
+        for key, info in ALL_MODELS.items():
+            if info['name'] == model_name:
+                return info.get('model_type', 'parakeet')
+        return 'parakeet'
+
+    def _update_model_constraints(self, model_name: str):
+        model_type = self._get_model_type(model_name)
+        is_canary = model_type == "canary"
+
+        # Canary: max chunk 40s, no timestamps
+        if is_canary:
+            self.segment_slider.setMaximum(CANARY_MAX_CHUNK_LENGTH)
+            if self.segment_slider.value() > CANARY_MAX_CHUNK_LENGTH:
+                self.segment_slider.setValue(CANARY_MAX_CHUNK_LENGTH)
+            self.timestamps_checkbox.setChecked(False)
+            self.timestamps_checkbox.setEnabled(False)
+            self.timestamps_checkbox.setToolTip("Timestamps are not supported by Canary-Qwen.")
+        else:
+            self.segment_slider.setMaximum(100)
+            self.timestamps_checkbox.setEnabled(True)
+            self.timestamps_checkbox.setToolTip("")
 
     def get_model(self) -> str:
         return f"{self.model_combo.currentText()} - {self.precision_combo.currentText()}"

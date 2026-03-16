@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 
 from config.settings import TranscriptionSettings
+from config.constants import ALL_MODELS
 from core.models.manager import ModelManager
 from core.transcription.file_scanner import FileScanner
 from core.transcription.service import TranscriptionService
@@ -103,8 +104,13 @@ class MainWindow(QWidget):
 
         chunk = settings.segment_length
         device = settings.device.lower()
+        model_info = ALL_MODELS.get(settings.model_key, {})
+        model_type = model_info.get('model_type', 'parakeet')
         chunk_warn = None
-        if device == "cpu" and chunk > 30:
+        if model_type == "canary":
+            # Canary slider is already clamped to 40s max; no chunk warning needed
+            pass
+        elif device == "cpu" and chunk > 30:
             chunk_warn = (
                 f"Audio chunk size is set to {chunk}s. "
                 "For CPU, 20-30 seconds is ideal. "

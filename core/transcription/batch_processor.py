@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import tempfile
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from threading import Event
@@ -10,6 +12,7 @@ import torch
 import av
 
 from config.settings import TranscriptionSettings
+from config.constants import CANARY_MAX_CHUNK_LENGTH
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +94,7 @@ class BatchProcessor(QThread):
         self.settings = settings
         self.model_info = model_info
         self.model_manager = model_manager
+        self.model_type = model_info.get('model_type', 'parakeet')
         self.stop_requested = Event()
 
     def request_stop(self):
@@ -133,11 +137,10 @@ class BatchProcessor(QThread):
                 self.error.emit(msg)
                 return
 
-            transcribe_timer = QElapsedTimer()
-            transcribe_timer.start()
+            transcribe_elapsed_ms = 0
 
             total_files = len(self.files)
-            use_timestamps = self.settings.word_timestamps
+            use_timestamps = self.settings.word_timestamps and self.model_type != "canary"
             fmt = self.settings.output_format
 
             for idx, audio_file in enumerate(self.files, 1):
@@ -148,7 +151,16 @@ class BatchProcessor(QThread):
                     self._emit_progress(idx, total_files, 0, 1, f"Loading {audio_file.name}")
                     audio = load_audio(str(audio_file))
 
-                    if use_timestamps:
+                    file_timer = QElapsedTimer()
+                    file_timer.start()
+
+                    if self.model_type == "canary":
+                        text = self._transcribe_canary(
+                            model, audio, audio_file.name, idx, total_files,
+                        )
+                        out_path = audio_file.with_suffix(".txt")
+                        out_path.write_text(text, encoding="utf-8")
+                    elif use_timestamps:
                         segments = self._transcribe_with_timestamps(
                             model, audio, audio_file.name, idx, total_files,
                         )
@@ -160,6 +172,8 @@ class BatchProcessor(QThread):
                         )
                         out_path = audio_file.with_suffix(".txt")
                         out_path.write_text(text, encoding="utf-8")
+
+                    transcribe_elapsed_ms += file_timer.elapsed()
 
                     self._emit_progress(idx, total_files, 1, 1, f"Completed {audio_file.name}")
 
@@ -178,7 +192,7 @@ class BatchProcessor(QThread):
         finally:
             total = timer.elapsed() / 1000.0
             try:
-                transcribe_time = transcribe_timer.elapsed() / 1000.0
+                transcribe_time = transcribe_elapsed_ms / 1000.0
             except Exception:
                 transcribe_time = 0.0
             try:
@@ -192,7 +206,10 @@ class BatchProcessor(QThread):
             self.finished.emit(summary)
 
     def _get_chunks(self, audio: np.ndarray):
-        segment_samples = self.settings.segment_length * SR
+        seg_len = self.settings.segment_length
+        if self.model_type == "canary":
+            seg_len = min(seg_len, CANARY_MAX_CHUNK_LENGTH)
+        segment_samples = seg_len * SR
         audio_length = len(audio)
         if audio_length > segment_samples:
             num_chunks = (audio_length + segment_samples - 1) // segment_samples
@@ -217,6 +234,49 @@ class BatchProcessor(QThread):
                     [chunk_audio], batch_size=1, timestamps=False, verbose=False,
                 )
             all_texts.append(self._extract_text(output))
+        return " ".join(t for t in all_texts if t)
+
+    def _transcribe_canary(self, model, audio: np.ndarray, filename: str,
+                           file_idx: int, total_files: int) -> str:
+        import soundfile as sf
+
+        chunks = self._get_chunks(audio)
+        all_texts = []
+        temp_files = []
+
+        try:
+            for i, (chunk_audio, _offset) in enumerate(chunks):
+                if self.stop_requested.is_set():
+                    break
+                self._emit_progress(file_idx, total_files, i, len(chunks), filename)
+
+                tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                temp_files.append(tmp.name)
+                sf.write(tmp.name, chunk_audio, SR)
+                tmp.close()
+
+                chunk_duration = len(chunk_audio) / SR
+                max_tokens = max(128, int(chunk_duration * 10))
+
+                with torch.inference_mode():
+                    answer_ids = model.generate(
+                        prompts=[
+                            [{"role": "user",
+                              "content": f"Transcribe the following: {model.audio_locator_tag}",
+                              "audio": [tmp.name]}]
+                        ],
+                        max_new_tokens=max_tokens,
+                    )
+
+                txt = model.tokenizer.ids_to_text(answer_ids[0].cpu()).strip()
+                all_texts.append(txt)
+        finally:
+            for tf_path in temp_files:
+                try:
+                    os.remove(tf_path)
+                except OSError:
+                    pass
+
         return " ".join(t for t in all_texts if t)
 
     def _transcribe_with_timestamps(self, model, audio: np.ndarray, filename: str,

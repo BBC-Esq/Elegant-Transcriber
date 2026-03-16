@@ -4,7 +4,7 @@ from typing import List, Optional
 from PySide6.QtCore import QObject, Signal
 
 from config.settings import TranscriptionSettings
-from config.constants import PARAKEET_MODELS
+from config.constants import ALL_MODELS
 from .batch_processor import BatchProcessor
 
 
@@ -23,7 +23,7 @@ class TranscriptionService(QObject):
         if not files:
             self.error_occurred.emit("No matching files found")
             return
-        model_info = PARAKEET_MODELS[settings.model_key]
+        model_info = ALL_MODELS[settings.model_key]
         self._processor = BatchProcessor(
             files=files,
             settings=settings,

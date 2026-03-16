@@ -1,22 +1,30 @@
-"""Patch NeMo toolkit for compatibility with both pre-v5 and v5+ transformers."""
+"""Patch NeMo toolkit and peft for compatibility with both pre-v5 and v5+ transformers."""
 import importlib.util
 import sys
 from pathlib import Path
 
 
-def _find_nemo_root() -> Path:
-    spec = importlib.util.find_spec("nemo")
+def _find_package_root(package_name: str) -> Path:
+    spec = importlib.util.find_spec(package_name)
     if spec and spec.submodule_search_locations:
         return Path(spec.submodule_search_locations[0])
-    raise RuntimeError("Cannot locate installed nemo package")
+    raise RuntimeError(f"Cannot locate installed {package_name} package")
 
 
-NEMO_ROOT = _find_nemo_root()
+NEMO_ROOT = _find_package_root("nemo")
+
+try:
+    PEFT_ROOT = _find_package_root("peft")
+except RuntimeError:
+    PEFT_ROOT = None
 
 PATCHES = []
 
 
 def patch(file_path, old, new, description):
+    """Register a patch. `old` can be a string or a list of strings (alternative patterns)."""
+    if isinstance(old, str):
+        old = [old]
     PATCHES.append((file_path, old, new, description))
 
 
@@ -62,16 +70,27 @@ patch(
     "auto_tokenizer.py: handle transformers>=5.0 ignoring vocab_file kwarg",
 )
 
+# hf_hub.py patches: handle both original NeMo 2.7.0 and partially-fixed versions.
+# Some NeMo builds already removed proxies/resume_download from the function signature
+# but left them in the cached_file() and super() calls. We target each location
+# independently so the patches work regardless of which fixes are already present.
+
 patch(
     NEMO_ROOT / "collections" / "speechlm2" / "parts" / "hf_hub.py",
-    """        force_download: bool,
+    [
+        # Original NeMo 2.7.0
+        """        force_download: bool,
         proxies: Optional[dict],
         resume_download: Optional[bool],
         local_files_only: bool,""",
-    """        force_download: bool,
+        # Prior patch version that used **kwargs
+        """        force_download: bool,
         local_files_only: bool,
         **kwargs,""",
-    "hf_hub.py: absorb removed proxies/resume_download via **kwargs",
+    ],
+    """        force_download: bool,
+        local_files_only: bool,""",
+    "hf_hub.py: remove proxies/resume_download from function signature",
 )
 
 patch(
@@ -92,9 +111,13 @@ patch(
     """            force_download=force_download,
             proxies=proxies,
             resume_download=resume_download,
-            local_files_only=local_files_only,""",
+            local_files_only=local_files_only,
+            token=token,
+            map_location=map_location,""",
     """            force_download=force_download,
-            local_files_only=local_files_only,""",
+            local_files_only=local_files_only,
+            token=token,
+            map_location=map_location,""",
     "hf_hub.py: remove proxies/resume_download from super()._from_pretrained call",
 )
 
@@ -117,9 +140,15 @@ patch(
     "magpietts_preference_optimization.py: explicit dtype cast for whisper inputs",
 )
 
+# hf_io_mixin.py patches: handle both the original NeMo (library='nemo') and
+# newer NeMo builds that already use filter=['nemo']. Each patch targets only
+# the original pattern; if already updated, the "already patched" check catches it.
+
 patch(
     NEMO_ROOT / "core" / "classes" / "mixins" / "hf_io_mixin.py",
-    """        model_filter = dict(
+    [
+        # Original NeMo 2.7.0
+        """        model_filter = dict(
             author=None,
             library='nemo',
             language=None,
@@ -130,7 +159,8 @@ patch(
             full=None,
             cardData=False,
         )""",
-    """        from packaging.version import Version as _V
+        # Prior patch version that used version-branching
+        """        from packaging.version import Version as _V
         import huggingface_hub as _hfh
         if _V(_hfh.__version__) >= _V("0.24"):
             model_filter = dict(
@@ -153,16 +183,28 @@ patch(
                 full=None,
                 cardData=False,
             )""",
-    "hf_io_mixin.py: version-aware model filter API for old and new huggingface_hub",
+    ],
+    """        model_filter = dict(
+            author=None,
+            filter=['nemo'],
+            model_name=None,
+            limit=None,
+            full=None,
+            cardData=False,
+        )""",
+    "hf_io_mixin.py: use filter=['nemo'] instead of library='nemo' for new huggingface_hub",
 )
 
 patch(
     NEMO_ROOT / "core" / "classes" / "mixins" / "hf_io_mixin.py",
-    """            # Make any modifications to the filter as necessary
+    [
+        # Original NeMo 2.7.0
+        """            # Make any modifications to the filter as necessary
             filt['language'] = [...]
             filt['task'] = ...
             filt['tags'] = [...]""",
-    """            # Make any modifications to the filter as necessary
+        # Prior patch version that used version-branching
+        """            # Make any modifications to the filter as necessary
             if 'filter' in filt:
                 filt['filter'].append('en')  # Add language filter
                 filt['filter'].append('automatic-speech-recognition')  # Add task filter
@@ -170,8 +212,25 @@ patch(
                 filt['language'] = [...]
                 filt['task'] = ...
                 filt['tags'] = [...]""",
-    "hf_io_mixin.py: version-aware docstring example for filter API",
+    ],
+    """            # Make any modifications to the filter as necessary
+            filt['filter'].append('en')  # Add language filter
+            filt['filter'].append('automatic-speech-recognition')  # Add task filter""",
+    "hf_io_mixin.py: update docstring example for filter API",
 )
+
+
+# --- peft patch: handle None from get_input_embeddings (needed for Canary-Qwen / SALM) ---
+if PEFT_ROOT is not None:
+    patch(
+        PEFT_ROOT / "utils" / "other.py",
+        "        input_embedding_params = set(model.get_input_embeddings().parameters())",
+        "        _input_emb = model.get_input_embeddings()\n"
+        "        if _input_emb is None:\n"
+        "            return []\n"
+        "        input_embedding_params = set(_input_emb.parameters())",
+        "peft/utils/other.py: handle None return from get_input_embeddings",
+    )
 
 
 def apply_patches():
@@ -179,7 +238,7 @@ def apply_patches():
     skipped = 0
     failed = 0
 
-    for file_path, old, new, description in PATCHES:
+    for file_path, old_patterns, new, description in PATCHES:
         if not file_path.exists():
             print(f"  SKIP (file not found): {description}")
             print(f"        {file_path}")
@@ -193,13 +252,20 @@ def apply_patches():
             skipped += 1
             continue
 
-        if old not in content:
+        # Try each alternative old pattern (supports upgrade from prior patch versions)
+        matched_old = None
+        for old in old_patterns:
+            if old in content:
+                matched_old = old
+                break
+
+        if matched_old is None:
             print(f"  FAIL (pattern not found): {description}")
             print(f"        {file_path}")
             failed += 1
             continue
 
-        content = content.replace(old, new, 1)
+        content = content.replace(matched_old, new, 1)
         file_path.write_text(content, encoding="utf-8")
         print(f"  OK: {description}")
         applied += 1
@@ -209,6 +275,7 @@ def apply_patches():
 
 if __name__ == "__main__":
     print(f"NeMo location: {NEMO_ROOT}")
+    print(f"peft location: {PEFT_ROOT or 'not installed'}")
     print(f"Patches to apply: {len(PATCHES)}")
     print()
 
