@@ -18,7 +18,7 @@ Transcription of a ~2.5 hour file [`sam_altman_lex_podcast_367.flac`](https://hu
 
 | Library | Model | Batch | Chunk | VRAM Usage | Time | [Quality Ranking](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard) |
 |---|---|---|---|---|---|---|
-| **[Elegant Transcriber](https://github.com/BBC-Esq/Elegant-Audio-Transcriber)** | **[Parakeet TDT 0.6B v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2)** | 1 | **90s** | **~3.3 GB** | **8.2s** | #8 |
+| **[Elegant Transcriber](https://github.com/BBC-Esq/Elegant-Audio-Transcriber)** | **[Parakeet TDT 0.6B v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2)** | 1 | **90s** | **~3.3 GB** | **14.9s** | #8 |
 | [Transformers](https://github.com/huggingface/transformers) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~12.4 GB | 52.2s | #32 |
 | [WhisperS2T Reborn](https://github.com/BBC-Esq/whisper-s2t-reborn) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~13.4 GB | 66.9s | #32 |
 | [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~12.5 GB | 75.9s | #32 |
