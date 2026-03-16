@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, Signal, QMutex
 import torch
 
 from config.constants import PARAKEET_MODELS
+from download_model import find_local_model
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class ModelManager(QObject):
         super().__init__()
         self._current_model = None
         self._current_config = None
+        self._last_error = None
         self._model_mutex = QMutex()
 
     def get_or_load_model(self, model_key: str, device: str,
@@ -52,6 +54,7 @@ class ModelManager(QObject):
             return self._current_model
         except Exception as e:
             logger.error(f"Model loading failed: {e}", exc_info=True)
+            self._last_error = str(e)
             self.model_error.emit(str(e))
             return None
         finally:
@@ -75,12 +78,27 @@ class ModelManager(QObject):
              contextlib.redirect_stderr(io.StringIO()):
             import nemo.collections.asr as nemo_asr
 
-        logger.info(f"Loading pretrained model: {model_id}")
-        with contextlib.redirect_stdout(io.StringIO()), \
-             contextlib.redirect_stderr(io.StringIO()):
-            model = nemo_asr.models.ASRModel.from_pretrained(
-                model_name=model_id, map_location="cpu"
-            )
+        local_path = find_local_model(model_id)
+        stderr_capture = io.StringIO()
+
+        if local_path:
+            logger.info(f"Loading model from local path: {local_path}")
+            with contextlib.redirect_stdout(io.StringIO()), \
+                 contextlib.redirect_stderr(stderr_capture):
+                model = nemo_asr.models.ASRModel.restore_from(
+                    restore_path=local_path, map_location="cpu"
+                )
+        else:
+            logger.info(f"Loading pretrained model from Hub: {model_id}")
+            with contextlib.redirect_stdout(io.StringIO()), \
+                 contextlib.redirect_stderr(stderr_capture):
+                model = nemo_asr.models.ASRModel.from_pretrained(
+                    model_name=model_id, map_location="cpu"
+                )
+
+        captured = stderr_capture.getvalue()
+        if captured:
+            logger.info(f"Model load stderr: {captured[:500]}")
 
         model = model.to(device)
         if device == "cuda" and torch_dtype != torch.float32:

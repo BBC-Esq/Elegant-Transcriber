@@ -289,6 +289,17 @@ def main():
 
     patch_success = run_nemo_patches()
 
+    print(f"\n\033[92mStep 5: Downloading Parakeet TDT 0.6B v2 model:\033[0m")
+    try:
+        result = subprocess.run(
+            [sys.executable, "download_model.py", "nvidia/parakeet-tdt-0.6b-v2"],
+            check=True, text=True, timeout=600,
+        )
+        model_download_success = True
+    except Exception as e:
+        print(f"\033[93mModel download failed: {e}. Model will download on first run.\033[0m")
+        model_download_success = False
+
     print("\n----- Installation Summary -----")
     print(f"\033[92mPyTorch + torchaudio installed successfully.\033[0m")
     print(f"\033[92mNeMo toolkit installed successfully.\033[0m")
@@ -298,6 +309,10 @@ def main():
         print(f"\033[92mNeMo patches applied successfully.\033[0m")
     else:
         print(f"\033[93mNeMo patches had issues — check output above.\033[0m")
+    if model_download_success:
+        print(f"\033[92mParakeet TDT v2 model downloaded successfully.\033[0m")
+    else:
+        print(f"\033[93mModel download had issues — will download on first run.\033[0m")
 
     end_time = time.time()
     total_time = end_time - start_time

@@ -1,10 +1,17 @@
 """Patch NeMo toolkit for compatibility with both pre-v5 and v5+ transformers."""
-import site
+import importlib.util
 import sys
 from pathlib import Path
 
-SITE_PACKAGES = Path(site.getsitepackages()[0])
-NEMO_ROOT = SITE_PACKAGES / "nemo"
+
+def _find_nemo_root() -> Path:
+    spec = importlib.util.find_spec("nemo")
+    if spec and spec.submodule_search_locations:
+        return Path(spec.submodule_search_locations[0])
+    raise RuntimeError("Cannot locate installed nemo package")
+
+
+NEMO_ROOT = _find_nemo_root()
 
 PATCHES = []
 

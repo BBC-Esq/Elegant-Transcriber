@@ -128,7 +128,9 @@ class BatchProcessor(QThread):
             load_time = load_timer.elapsed() / 1000.0
 
             if not model:
-                self.error.emit("Failed to load model")
+                detail = getattr(self.model_manager, '_last_error', None)
+                msg = f"Failed to load model: {detail}" if detail else "Failed to load model"
+                self.error.emit(msg)
                 return
 
             transcribe_timer = QElapsedTimer()
