@@ -23,7 +23,7 @@ Transcription of a ~2.5 hour file [`sam_altman_lex_podcast_367.flac`](https://hu
 | [WhisperS2T Reborn](https://github.com/BBC-Esq/whisper-s2t-reborn) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~13.4 GB | 66.9s | #32 |
 | [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~12.5 GB | 75.9s | #32 |
 | [WhisperX](https://github.com/m-bain/whisperX) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~12.8 GB | 71.8s | #32 |
-| [Granite Speech](https://github.com/ibm-granite/granite-speech) | [Granite 4.0 1B Speech](https://huggingface.co/ibm-granite/granite-speech-3.3-8b) | 12 | 30s | ~6.3 GB | 97.7s | #1 |
+| [Granite Speech](https://github.com/ibm-granite/granite-speech) | [Granite 4.0 1B Speech](https://huggingface.co/ibm-granite/granite-4.0-1b-speech) | 12 | 30s | ~6.3 GB | 97.7s | #1 |
 
 > All models were run in ```bfloat16```.<br>
 > All VRAM measurements include model weights and inference overhead and subtract background usage.<br>
