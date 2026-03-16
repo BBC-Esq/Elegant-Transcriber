@@ -69,7 +69,7 @@ python main.py
 * 12 minute 58 second private audio file.
 * CPU tests use a shorter audio sample to keep runtimes manageable.
 
-| Library | Model | Batch | Chunk | VRAM Usage | Time | Real Time | [Quality Ranking](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard) |
+| Library | Model | Batch | Chunk | RAM Usage | Time | Real Time | [Quality Ranking](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard) |
 |---|---|---|---|---|---|---|---|
 | **[Elegant Transcriber](https://github.com/BBC-Esq/Elegant-Audio-Transcriber)** | **[Parakeet TDT 0.6B v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2)** | 1 | **90s** | **~5.6 GB** | **29.0s** | **26.8x** | #8 |
 | [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 1 | Default | ~6.5 GB | 211.8s | 3.67x | #32 |
