@@ -4,7 +4,7 @@
 
 </div>
 
-## 4x faster than the fasted Whisper implementation with higher accuracy.
+## 4x faster than the fastest Whisper implementation AND higher accuracy.
 - Batch transcribe multiple files recursively in directories or sub-directories.
 - Optional timestamps with configurable segment intervals
 - Works on GPU (CUDA) and CPU, Windows or Linux
