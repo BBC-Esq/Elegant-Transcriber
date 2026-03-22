@@ -1,0 +1,38 @@
+# Python virtual environment
+Lib/
+Scripts/
+Include/
+share/
+pyvenv.cfg
+.lock
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Downloaded models
+models/
+
+# Installer development
+installer/
+installer-output/
+tools/
+Elegant_Transcriber_Setup.exe
+
+# Test files
+tests/
+test_client.py
+test_short.MP3
+
+# Pytest
+.pytest_cache/
+
+# Local settings
+settings.yaml
+
+# Test directories
+TEST_MULTIPLE/
+TEST_SINGLE/
+
+# Claude Code
+.claude/

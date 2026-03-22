@@ -3,6 +3,7 @@ from PySide6.QtCore import Qt, Slot, QSettings
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QGroupBox, QLabel, QPushButton,
     QHBoxLayout, QCheckBox, QFileDialog, QMessageBox,
+    QDialog, QSpinBox, QDialogButtonBox,
 )
 
 from config.settings import TranscriptionSettings
@@ -10,6 +11,7 @@ from config.constants import ALL_MODELS
 from core.models.manager import ModelManager
 from core.transcription.file_scanner import FileScanner
 from core.transcription.service import TranscriptionService
+from core.server.server_manager import ServerManager
 from gui.settings_widget import SettingsWidget
 from gui.widgets.metrics_bar import MetricsBar
 
@@ -21,6 +23,7 @@ class MainWindow(QWidget):
         self.model_manager = ModelManager()
         self.transcription_service = TranscriptionService()
         self.file_scanner = FileScanner()
+        self.server_manager = ServerManager()
         self.selected_directory = None
         self._qsettings = QSettings("ElegantAudioTranscriber", "ElegantAudioTranscriber")
 
@@ -66,6 +69,10 @@ class MainWindow(QWidget):
         self.stop_button.setEnabled(False)
         controls_layout.addWidget(self.stop_button)
 
+        self.server_button = QPushButton("Server")
+        self.server_button.clicked.connect(self._toggle_server)
+        controls_layout.addWidget(self.server_button)
+
         layout.addLayout(controls_layout)
 
         self.metrics_bar = MetricsBar()
@@ -75,6 +82,11 @@ class MainWindow(QWidget):
         self.transcription_service.error_occurred.connect(self._on_error)
         self.transcription_service.progress_updated.connect(self._update_progress)
         self.transcription_service.completed.connect(self._on_processing_completed)
+        self.server_manager.server_started.connect(self._on_server_started)
+        self.server_manager.server_stopped.connect(self._on_server_stopped)
+        self.server_manager.server_error.connect(self._on_server_error)
+
+    # -- directory / transcription --
 
     @Slot()
     def _select_directory(self):
@@ -108,7 +120,6 @@ class MainWindow(QWidget):
         model_type = model_info.get('model_type', 'parakeet')
         chunk_warn = None
         if model_type == "canary":
-            # Canary slider is already clamped to 40s max; no chunk warning needed
             pass
         elif device == "cpu" and chunk > 30:
             chunk_warn = (
@@ -170,6 +181,28 @@ class MainWindow(QWidget):
             selected_extensions=self.settings_widget.get_selected_extensions(),
         )
 
+    # -- processing state --
+
+    def _on_processing_started(self):
+        self.start_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
+        self.settings_widget.setEnabled(False)
+        self.server_button.setEnabled(False)
+
+    def _on_processing_stopped(self):
+        self.start_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        self.settings_widget.setEnabled(True)
+        self.server_button.setEnabled(True)
+
+    @Slot(str)
+    def _on_processing_completed(self, message: str):
+        self.start_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        self.settings_widget.setEnabled(True)
+        self.server_button.setEnabled(True)
+        self.progress_label.setText(f"Status: Completed | {message}")
+
     @Slot(str)
     def _on_error(self, message: str):
         self.progress_label.setText(f"ERROR: {message}")
@@ -179,22 +212,105 @@ class MainWindow(QWidget):
     def _update_progress(self, current: int, total: int, message: str):
         self.progress_label.setText(f"Status: {message}")
 
-    def _on_processing_started(self):
-        self.start_button.setEnabled(False)
-        self.stop_button.setEnabled(True)
-        self.settings_widget.setEnabled(False)
+    # -- server mode --
 
-    def _on_processing_stopped(self):
-        self.start_button.setEnabled(True)
+    @Slot()
+    def _toggle_server(self):
+        if self.server_manager.is_running():
+            self._stop_server()
+        else:
+            self._start_server()
+
+    def _start_server(self):
+        # Block if GUI transcription is in progress
+        if (self.transcription_service._processor
+                and self.transcription_service._processor.isRunning()):
+            QMessageBox.warning(
+                self, "Server",
+                "Cannot start server while a transcription is in progress.",
+            )
+            return
+
+        # Show port dialog
+        port = self._show_port_dialog()
+        if port is None:
+            return
+
+        settings = self._build_settings()
+        self.server_manager.start_server(
+            port=port,
+            model_manager=self.model_manager,
+            default_settings=settings,
+        )
+
+    def _stop_server(self):
+        if self.server_manager.is_transcription_active():
+            reply = QMessageBox.warning(
+                self, "Server",
+                "A transcription is currently in progress via the API.\n\n"
+                "Stopping the server will cancel it. Continue?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply == QMessageBox.No:
+                return
+
+        self.server_manager.stop_server()
+
+    def _show_port_dialog(self) -> int | None:
+        """Show a dialog to configure the server port. Returns port or None."""
+        saved_port = self._qsettings.value("server_port", 7862, type=int)
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Start Server")
+        dialog.setFixedSize(250, 100)
+        layout = QVBoxLayout(dialog)
+
+        port_layout = QHBoxLayout()
+        port_layout.addWidget(QLabel("Port:"))
+        port_spin = QSpinBox()
+        port_spin.setRange(1024, 65535)
+        port_spin.setValue(saved_port)
+        port_layout.addWidget(port_spin)
+        layout.addLayout(port_layout)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        if dialog.exec() == QDialog.Accepted:
+            port = port_spin.value()
+            self._qsettings.setValue("server_port", port)
+            return port
+        return None
+
+    @Slot(int)
+    def _on_server_started(self, port: int):
+        self.server_button.setText("Stop Server")
+        self.settings_widget.setEnabled(False)
+        self.select_dir_button.setEnabled(False)
+        self.recursive_checkbox.setEnabled(False)
+        self.start_button.setEnabled(False)
         self.stop_button.setEnabled(False)
+        self.progress_label.setText(f"Status: Server running on port {port}")
+
+    @Slot()
+    def _on_server_stopped(self):
+        self.server_button.setText("Server")
         self.settings_widget.setEnabled(True)
+        self.select_dir_button.setEnabled(True)
+        self.recursive_checkbox.setEnabled(True)
+        self.start_button.setEnabled(bool(self.selected_directory))
+        self.stop_button.setEnabled(False)
+        self.progress_label.setText("Status: Idle")
 
     @Slot(str)
-    def _on_processing_completed(self, message: str):
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
-        self.settings_widget.setEnabled(True)
-        self.progress_label.setText(f"Status: Completed | {message}")
+    def _on_server_error(self, message: str):
+        self._on_server_stopped()
+        QMessageBox.critical(self, "Server Error", message)
+
+    # -- settings persistence --
 
     def _load_settings(self):
         saved_recursive = self._qsettings.value("recursive", False, type=bool)
@@ -206,6 +322,7 @@ class MainWindow(QWidget):
 
     def closeEvent(self, event):
         self._save_settings()
+        self.server_manager.cleanup()
         self.transcription_service.cleanup()
         self.model_manager.cleanup()
         self.metrics_bar.cleanup()

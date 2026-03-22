@@ -98,6 +98,9 @@ app_libs = [
     "pyside6",
     "peft>=0.18.0",
     "soundfile",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
 ]
 
 version_overrides = [
