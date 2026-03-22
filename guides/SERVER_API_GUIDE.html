@@ -507,19 +507,19 @@ response <span class="op">=</span> requests.<span class="fn">post</span>(
 
 <table>
   <thead>
-    <tr><th>Parameter</th><th>Type</th><th>Description</th><th>Example Values</th></tr>
+    <tr><th>Parameter</th><th>Type</th><th>Description</th><th>Values</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>model</code></td><td>string</td><td>Which model to use</td><td><code>"Parakeet TDT 0.6B v2"</code>, <code>"Canary-Qwen 2.5B"</code></td></tr>
+    <tr><td><code>model</code></td><td>string</td><td>Which model to use</td><td><code>"Parakeet TDT 0.6B v2"</code>, <code>"Parakeet TDT 0.6B v3"</code>, <code>"Canary-Qwen 2.5B"</code></td></tr>
     <tr><td><code>precision</code></td><td>string</td><td>Numerical precision</td><td><code>"bfloat16"</code>, <code>"float16"</code>, <code>"float32"</code></td></tr>
     <tr><td><code>device</code></td><td>string</td><td>CPU or GPU</td><td><code>"cuda"</code>, <code>"cpu"</code></td></tr>
     <tr><td><code>output_format</code></td><td>string</td><td>Timestamp output format</td><td><code>"txt"</code>, <code>"srt"</code>, <code>"vtt"</code>, <code>"json"</code></td></tr>
     <tr><td><code>word_timestamps</code></td><td>boolean</td><td>Enable word-level timestamps</td><td><code>"true"</code>, <code>"false"</code></td></tr>
-    <tr><td><code>segment_length</code></td><td>integer</td><td>Audio chunk size in seconds</td><td><code>"30"</code>, <code>"80"</code></td></tr>
-    <tr><td><code>segment_duration</code></td><td>integer</td><td>Timestamp grouping interval</td><td><code>"5"</code>, <code>"10"</code></td></tr>
+    <tr><td><code>segment_length</code></td><td>integer</td><td>Audio chunk size in seconds</td><td>e.g. <code>"30"</code>, <code>"60"</code>, <code>"80"</code></td></tr>
+    <tr><td><code>segment_duration</code></td><td>integer</td><td>Timestamp grouping interval in seconds</td><td>e.g. <code>"5"</code>, <code>"10"</code>, <code>"15"</code></td></tr>
     <tr><td><code>audio_format</code></td><td>string</td><td>Override input format auto-detection</td><td><code>"auto"</code>, <code>"file"</code>, <code>"numpy"</code>, <code>"tensor"</code>, <code>"pcm"</code></td></tr>
-    <tr><td><code>sample_rate</code></td><td>integer</td><td>Sample rate of raw audio input</td><td><code>"16000"</code>, <code>"44100"</code></td></tr>
-    <tr><td><code>dtype</code></td><td>string</td><td>Data type for raw PCM input</td><td><code>"float32"</code>, <code>"int16"</code></td></tr>
+    <tr><td><code>sample_rate</code></td><td>integer</td><td>Sample rate of raw audio input</td><td>e.g. <code>"16000"</code>, <code>"22050"</code>, <code>"44100"</code>, <code>"48000"</code></td></tr>
+    <tr><td><code>dtype</code></td><td>string</td><td>Data type for raw PCM input</td><td><code>"float32"</code>, <code>"float64"</code>, <code>"int16"</code>, <code>"int32"</code></td></tr>
   </tbody>
 </table>
 
@@ -1204,18 +1204,18 @@ print(response.json()["text"])
 
 Every setting is optional. If omitted, the server uses whatever was configured in the GUI when the server was started.
 
-| Parameter        | Type    | Description                          | Example Values                                      |
-|------------------|---------|--------------------------------------|-----------------------------------------------------|
-| model            | string  | Which model to use                   | "Parakeet TDT 0.6B v2", "Canary-Qwen 2.5B"        |
-| precision        | string  | Numerical precision                  | "bfloat16", "float16", "float32"                    |
-| device           | string  | CPU or GPU                           | "cuda", "cpu"                                       |
-| output_format    | string  | Timestamp output format              | "txt", "srt", "vtt", "json"                         |
-| word_timestamps  | boolean | Enable word-level timestamps         | "true", "false"                                     |
-| segment_length   | integer | Audio chunk size in seconds          | "30", "80"                                          |
-| segment_duration | integer | Timestamp grouping interval          | "5", "10"                                           |
-| audio_format     | string  | Override input format auto-detection | "auto", "file", "numpy", "tensor", "pcm"           |
-| sample_rate      | integer | Sample rate of raw audio input       | "16000", "44100"                                    |
-| dtype            | string  | Data type for raw PCM input          | "float32", "int16"                                  |
+| Parameter        | Type    | Description                              | Values                                                          |
+|------------------|---------|------------------------------------------|-----------------------------------------------------------------|
+| model            | string  | Which model to use                       | "Parakeet TDT 0.6B v2", "Parakeet TDT 0.6B v3", "Canary-Qwen 2.5B" |
+| precision        | string  | Numerical precision                      | "bfloat16", "float16", "float32"                                |
+| device           | string  | CPU or GPU                               | "cuda", "cpu"                                                   |
+| output_format    | string  | Timestamp output format                  | "txt", "srt", "vtt", "json"                                    |
+| word_timestamps  | boolean | Enable word-level timestamps             | "true", "false"                                                 |
+| segment_length   | integer | Audio chunk size in seconds              | e.g. "30", "60", "80"                                          |
+| segment_duration | integer | Timestamp grouping interval in seconds   | e.g. "5", "10", "15"                                           |
+| audio_format     | string  | Override input format auto-detection     | "auto", "file", "numpy", "tensor", "pcm"                       |
+| sample_rate      | integer | Sample rate of raw audio input           | e.g. "16000", "22050", "44100", "48000"                         |
+| dtype            | string  | Data type for raw PCM input              | "float32", "float64", "int16", "int32"                          |
 
 ### Example with Custom Settings
 
