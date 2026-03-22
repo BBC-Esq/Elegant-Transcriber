@@ -195,22 +195,24 @@ class MainWindow(QWidget):
         self.settings_widget.setEnabled(False)
         self.server_button.setEnabled(False)
 
-    def _on_processing_stopped(self):
-        self.start_button.setEnabled(True)
+    def _reset_ui_after_processing(self):
+        server_active = self.server_manager.is_running()
+        self.start_button.setEnabled(not server_active)
         self.stop_button.setEnabled(False)
-        self.settings_widget.setEnabled(True)
+        self.settings_widget.setEnabled(not server_active)
         self.server_button.setEnabled(True)
+
+    def _on_processing_stopped(self):
+        self._reset_ui_after_processing()
 
     @Slot(str)
     def _on_processing_completed(self, message: str):
-        self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
-        self.settings_widget.setEnabled(True)
-        self.server_button.setEnabled(True)
+        self._reset_ui_after_processing()
         self.progress_label.setText(f"Status: Completed | {message}")
 
     @Slot(str)
     def _on_error(self, message: str):
+        self._reset_ui_after_processing()
         self.progress_label.setText(f"ERROR: {message}")
         QMessageBox.critical(self, "Error", message)
 
@@ -340,6 +342,7 @@ class MainWindow(QWidget):
         self._guide_window = QWidget()
         self._guide_window.setWindowTitle("Elegant Audio Transcriber — User Guide")
         self._guide_window.resize(960, 750)
+        self._guide_window.destroyed.connect(lambda: setattr(self, '_guide_window', None))
 
         layout = QVBoxLayout(self._guide_window)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -348,6 +351,7 @@ class MainWindow(QWidget):
         web_view.setUrl(QUrl.fromLocalFile(str(guide_path)))
         layout.addWidget(web_view)
 
+        self._guide_window.setAttribute(Qt.WA_DeleteOnClose)
         self._guide_window.show()
 
     def closeEvent(self, event):

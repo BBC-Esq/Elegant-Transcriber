@@ -71,6 +71,8 @@ class ServerManager(QObject):
 
     def stop_server(self):
         """Signal the server to shut down and wait for the thread to finish."""
+        was_running = self.is_running()
+
         if self._server is not None:
             self._server.should_exit = True
 
@@ -81,8 +83,10 @@ class ServerManager(QObject):
             self._thread = None
 
         self._server = None
-        logger.info("Server stopped")
-        self.server_stopped.emit()
+
+        if was_running:
+            logger.info("Server stopped")
+            self.server_stopped.emit()
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()

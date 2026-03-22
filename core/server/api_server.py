@@ -97,13 +97,17 @@ def _load_audio_from_file(path: str) -> np.ndarray:
     """Load audio file using PyAV (same as batch_processor.load_audio)."""
     import av
     container = av.open(path)
-    resampler = av.AudioResampler(format='s16', layout='mono', rate=SR)
-    frames = []
-    for frame in container.decode(audio=0):
-        resampled = resampler.resample(frame)
-        for r in resampled:
-            frames.append(r.to_ndarray())
-    container.close()
+    try:
+        resampler = av.AudioResampler(format='s16', layout='mono', rate=SR)
+        frames = []
+        for frame in container.decode(audio=0):
+            resampled = resampler.resample(frame)
+            for r in resampled:
+                frames.append(r.to_ndarray())
+    finally:
+        container.close()
+    if not frames:
+        raise ValueError("No audio frames decoded — file may be empty or corrupted")
     return np.concatenate(frames, axis=1).flatten().astype(np.float32) / 32768.0
 
 
