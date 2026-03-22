@@ -14,7 +14,7 @@
 ## Installation
 
 ### 1. Windows (installer)
-> Download and run [```Elegant_Transcriber_Setup.exe```](https://github.com/BBC-Esq/Elegant-Audio-Transcriber/releases/latest/download/Elegant_Transcriber_Setup.exe).
+> Download and run [```Elegant_Transcriber_Setup.exe```](https://github.com/BBC-Esq/Elegant-Audio-Transcriber/releases/latest/download/Elegant_Transcriber_Setup.exe) (right-click and run as administrator)
 
 ### 2. Windows (from source)
 
