@@ -1,10 +1,11 @@
 from pathlib import Path
-from PySide6.QtCore import Qt, Slot, QSettings
+from PySide6.QtCore import Qt, Slot, QSettings, QUrl
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QGroupBox, QLabel, QPushButton,
     QHBoxLayout, QCheckBox, QFileDialog, QMessageBox,
     QDialog, QSpinBox, QDialogButtonBox,
 )
+from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from config.settings import TranscriptionSettings
 from config.constants import ALL_MODELS
@@ -25,6 +26,7 @@ class MainWindow(QWidget):
         self.file_scanner = FileScanner()
         self.server_manager = ServerManager()
         self.selected_directory = None
+        self._guide_window = None
         self._qsettings = QSettings("ElegantAudioTranscriber", "ElegantAudioTranscriber")
 
         self._init_ui()
@@ -72,6 +74,10 @@ class MainWindow(QWidget):
         self.server_button = QPushButton("Server")
         self.server_button.clicked.connect(self._toggle_server)
         controls_layout.addWidget(self.server_button)
+
+        self.guide_button = QPushButton("User Guide")
+        self.guide_button.clicked.connect(self._open_user_guide)
+        controls_layout.addWidget(self.guide_button)
 
         layout.addLayout(controls_layout)
 
@@ -320,8 +326,34 @@ class MainWindow(QWidget):
         self._qsettings.setValue("recursive", self.recursive_checkbox.isChecked())
         self.settings_widget.save_settings()
 
+    def _open_user_guide(self):
+        if self._guide_window is not None and self._guide_window.isVisible():
+            self._guide_window.raise_()
+            self._guide_window.activateWindow()
+            return
+
+        guide_path = Path(__file__).resolve().parent.parent / "guides" / "SERVER_API_GUIDE.html"
+        if not guide_path.is_file():
+            QMessageBox.warning(self, "User Guide", f"Guide file not found:\n{guide_path}")
+            return
+
+        self._guide_window = QWidget()
+        self._guide_window.setWindowTitle("Elegant Audio Transcriber — User Guide")
+        self._guide_window.resize(960, 750)
+
+        layout = QVBoxLayout(self._guide_window)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        web_view = QWebEngineView()
+        web_view.setUrl(QUrl.fromLocalFile(str(guide_path)))
+        layout.addWidget(web_view)
+
+        self._guide_window.show()
+
     def closeEvent(self, event):
         self._save_settings()
+        if self._guide_window is not None:
+            self._guide_window.close()
         self.server_manager.cleanup()
         self.transcription_service.cleanup()
         self.model_manager.cleanup()
