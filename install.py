@@ -287,7 +287,7 @@ def main():
         print(f"\033[91mVersion overrides failed after {attempts_overrides} attempts.\033[0m")
         sys.exit(1)
 
-    print(f"\n\033[92mStep 4: Installing app libraries (av, psutil, pyside6, peft, soundfile):\033[0m")
+    print(f"\n\033[92mStep 4: Installing app libraries (av, psutil, pyside6, peft, soundfile, fastapi, uvicorn, python-multipart):\033[0m")
     success_app, attempts_app = install_libraries(app_libs)
     if not success_app:
         print(f"\033[91mApp library installation failed after {attempts_app} attempts.\033[0m")

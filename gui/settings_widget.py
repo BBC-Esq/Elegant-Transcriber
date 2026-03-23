@@ -266,8 +266,11 @@ class SettingsWidget(QGroupBox):
                 self.precision_combo.setCurrentText(saved_precision)
 
         saved_seg = self._settings.value("segment_length", DEFAULT_SEGMENT_LENGTH, type=int)
-        if 10 <= saved_seg <= 100:
+        max_seg = self.segment_slider.maximum()
+        if 10 <= saved_seg <= max_seg:
             self.segment_slider.setValue(saved_seg)
+        elif saved_seg > max_seg:
+            self.segment_slider.setValue(max_seg)
 
         saved_ts = self._settings.value("timestamps", False, type=bool)
         self.timestamps_checkbox.setChecked(saved_ts)

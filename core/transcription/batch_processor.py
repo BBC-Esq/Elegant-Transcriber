@@ -21,13 +21,17 @@ SR = 16000
 
 def load_audio(audio_path: str, target_sr: int = SR) -> np.ndarray:
     container = av.open(audio_path)
-    resampler = av.AudioResampler(format='s16', layout='mono', rate=target_sr)
-    frames = []
-    for frame in container.decode(audio=0):
-        resampled = resampler.resample(frame)
-        for r in resampled:
-            frames.append(r.to_ndarray())
-    container.close()
+    try:
+        resampler = av.AudioResampler(format='s16', layout='mono', rate=target_sr)
+        frames = []
+        for frame in container.decode(audio=0):
+            resampled = resampler.resample(frame)
+            for r in resampled:
+                frames.append(r.to_ndarray())
+    finally:
+        container.close()
+    if not frames:
+        raise ValueError(f"No audio frames decoded from {audio_path}")
     return np.concatenate(frames, axis=1).flatten().astype(np.float32) / 32768.0
 
 
