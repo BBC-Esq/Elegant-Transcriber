@@ -85,6 +85,6 @@ python main.py
 > I couldn't get Granite Speech to run...
 
 ## Special Thanks
-* Nvidia for the Parkeet models, which are hands down the best balance of accuracy and compute time for most people.
-* IBM for Granite Speech Models, which, as of March, 2026, rank #1 on the ASR leaderboard in terms of accuracy.
-* OpenAI for the older Whisper models.
+* Nvidia for the Parkeet models, which are hands down the best balance of accuracy and compute time for most people IMHO.
+* IBM for Granite Speech Models, which, as of March, 2026, rank #1 on the ASR leaderboard in terms of accuracy.  I'll include them in a later release.
+* OpenAI for the older Whisper models setting the gold standard for so many years.
