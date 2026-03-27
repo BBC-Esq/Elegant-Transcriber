@@ -57,6 +57,9 @@ def stitch_texts(texts: List[str], had_overlap: List[bool],
 
         if best_match_len > 0:
             remaining = curr_words[best_match_len:]
+            # Deduplicate boundary word if both chunks transcribed it
+            if remaining and prev_words and remaining[0].lower().rstrip(".,;:!?") == prev_words[-1].lower().rstrip(".,;:!?"):
+                remaining = remaining[1:]
             if remaining:
                 result = result + " " + " ".join(remaining)
         else:
@@ -93,8 +96,16 @@ def stitch_timestamp_segments(
 
         last_end_time = result[-1][1] if result else 0.0
 
+        first_kept = True
         for seg in curr_segments:
             if seg[0] >= last_end_time - 0.05:
+                # Deduplicate: if the first word kept from chunk N+1
+                # is identical to the last word kept from chunk N,
+                # skip it (both chunks transcribed the boundary word).
+                if first_kept and result and seg[2].lower().rstrip(".,;:!?") == result[-1][2].lower().rstrip(".,;:!?"):
+                    first_kept = False
+                    continue
+                first_kept = False
                 result.append(seg)
 
     return result
