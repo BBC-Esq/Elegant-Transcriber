@@ -1,4 +1,3 @@
-"""Patch NeMo toolkit and peft for compatibility with both pre-v5 and v5+ transformers."""
 import importlib.util
 import sys
 from pathlib import Path
@@ -22,7 +21,6 @@ PATCHES = []
 
 
 def patch(file_path, old, new, description):
-    """Register a patch. `old` can be a string or a list of strings (alternative patterns)."""
     if isinstance(old, str):
         old = [old]
     PATCHES.append((file_path, old, new, description))
@@ -70,20 +68,13 @@ patch(
     "auto_tokenizer.py: handle transformers>=5.0 ignoring vocab_file kwarg",
 )
 
-# hf_hub.py patches: handle both original NeMo 2.7.0 and partially-fixed versions.
-# Some NeMo builds already removed proxies/resume_download from the function signature
-# but left them in the cached_file() and super() calls. We target each location
-# independently so the patches work regardless of which fixes are already present.
-
 patch(
     NEMO_ROOT / "collections" / "speechlm2" / "parts" / "hf_hub.py",
     [
-        # Original NeMo 2.7.0
         """        force_download: bool,
         proxies: Optional[dict],
         resume_download: Optional[bool],
         local_files_only: bool,""",
-        # Prior patch version that used **kwargs
         """        force_download: bool,
         local_files_only: bool,
         **kwargs,""",
@@ -140,14 +131,9 @@ patch(
     "magpietts_preference_optimization.py: explicit dtype cast for whisper inputs",
 )
 
-# hf_io_mixin.py patches: handle both the original NeMo (library='nemo') and
-# newer NeMo builds that already use filter=['nemo']. Each patch targets only
-# the original pattern; if already updated, the "already patched" check catches it.
-
 patch(
     NEMO_ROOT / "core" / "classes" / "mixins" / "hf_io_mixin.py",
     [
-        # Original NeMo 2.7.0
         """        model_filter = dict(
             author=None,
             library='nemo',
@@ -159,7 +145,6 @@ patch(
             full=None,
             cardData=False,
         )""",
-        # Prior patch version that used version-branching
         """        from packaging.version import Version as _V
         import huggingface_hub as _hfh
         if _V(_hfh.__version__) >= _V("0.24"):
@@ -198,12 +183,10 @@ patch(
 patch(
     NEMO_ROOT / "core" / "classes" / "mixins" / "hf_io_mixin.py",
     [
-        # Original NeMo 2.7.0
         """            # Make any modifications to the filter as necessary
             filt['language'] = [...]
             filt['task'] = ...
             filt['tags'] = [...]""",
-        # Prior patch version that used version-branching
         """            # Make any modifications to the filter as necessary
             if 'filter' in filt:
                 filt['filter'].append('en')  # Add language filter
@@ -220,7 +203,6 @@ patch(
 )
 
 
-# --- peft patch: handle None from get_input_embeddings (needed for Canary-Qwen / SALM) ---
 if PEFT_ROOT is not None:
     patch(
         PEFT_ROOT / "utils" / "other.py",
@@ -252,7 +234,6 @@ def apply_patches():
             skipped += 1
             continue
 
-        # Try each alternative old pattern (supports upgrade from prior patch versions)
         matched_old = None
         for old in old_patterns:
             if old in content:

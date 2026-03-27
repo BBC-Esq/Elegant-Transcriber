@@ -7,7 +7,6 @@ from PySide6.QtGui import QPainter, QColor, QPainterPath, QPen, QPixmap, QLinear
 from core.monitoring.metrics_store import MetricsStore
 from core.monitoring.system_metrics import SystemMetrics
 
-# Shared metric definitions: (key, label, color, accessor, gpu_only)
 METRIC_DEFS = [
     ("cpu",   "CPU",       "#FF4136", lambda m: m.cpu_usage,           False),
     ("ram",   "RAM",       "#B10DC9", lambda m: m.ram_usage_percent,   False),

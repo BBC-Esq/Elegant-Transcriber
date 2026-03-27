@@ -129,7 +129,6 @@ class ModelManager(QObject):
              contextlib.redirect_stderr(io.StringIO()):
             from nemo.collections.speechlm2.models import SALM
 
-        # Monkey-patch Qwen3 for transformers 5 compatibility
         try:
             from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM, Qwen3Model
             if not hasattr(Qwen3ForCausalLM, '_patched_get_input_embeddings'):

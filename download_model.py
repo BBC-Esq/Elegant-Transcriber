@@ -1,12 +1,9 @@
-"""Download model files to the local models directory."""
 import os
 import sys
 from pathlib import Path
 from huggingface_hub import hf_hub_download, snapshot_download
 
 
-# Models with a filename use hf_hub_download (single .nemo file).
-# Models with None use snapshot_download (full HF directory).
 MODELS = {
     "nvidia/parakeet-tdt-0.6b-v2": "parakeet-tdt-0.6b-v2.nemo",
     "nvidia/parakeet-tdt-0.6b-v3": "parakeet-tdt-0.6b-v3.nemo",
@@ -35,11 +32,9 @@ def find_local_model(repo_id: str) -> str:
         return None
     filename = MODELS.get(repo_id)
     if filename:
-        # Single-file model (.nemo): check file exists
         if path.is_file():
             return str(path)
     else:
-        # Directory model (HF repo): check dir exists with config.json
         if path.is_dir() and (path / "config.json").is_file():
             return str(path)
     return None
@@ -53,7 +48,6 @@ def download_model(repo_id: str) -> str:
     local_path = get_local_model_path(repo_id)
 
     if filename:
-        # Single-file download (.nemo)
         if local_path.is_file():
             size_mb = local_path.stat().st_size / 1024 / 1024
             print(f"Model already exists: {local_path} ({size_mb:.1f} MB)")
@@ -76,7 +70,6 @@ def download_model(repo_id: str) -> str:
         else:
             raise RuntimeError(f"Download completed but file not found at {local_path}")
     else:
-        # Directory download (full HF repo)
         if local_path.is_dir() and (local_path / "config.json").is_file():
             print(f"Model already exists: {local_path}")
             return str(local_path)

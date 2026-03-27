@@ -1,6 +1,5 @@
 from collections import OrderedDict
 
-# (name, model_id, precision, default_segment_length, vram_estimate, model_type)
 _MODEL_SPECS = [
     ("Parakeet TDT 0.6B v2", "nvidia/parakeet-tdt-0.6b-v2", "bfloat16", 80, "~1.5 GB", "parakeet"),
     ("Parakeet TDT 0.6B v2", "nvidia/parakeet-tdt-0.6b-v2", "float16",  80, "~1.5 GB", "parakeet"),
@@ -25,7 +24,6 @@ ALL_MODELS = {
     for name, model_id, prec, seg_len, vram, model_type in _MODEL_SPECS
 }
 
-# Backwards-compatible alias
 PARAKEET_MODELS = ALL_MODELS
 
 MODEL_NAMES = list(OrderedDict.fromkeys(name for name, *_ in _MODEL_SPECS))

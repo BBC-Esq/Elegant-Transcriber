@@ -1,5 +1,3 @@
-"""Manages the uvicorn server lifecycle from the Qt main thread."""
-
 import logging
 import threading
 from typing import Optional
@@ -12,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class ServerManager(QObject):
-    server_started = Signal(int)   # port
+    server_started = Signal(int)
     server_stopped = Signal()
     server_error = Signal(str)
 
@@ -23,7 +21,6 @@ class ServerManager(QObject):
         self._port: int = 0
 
     def start_server(self, port: int, model_manager, default_settings: TranscriptionSettings):
-        """Start the uvicorn server in a daemon thread."""
         if self.is_running():
             self.server_error.emit("Server is already running")
             return
@@ -63,14 +60,12 @@ class ServerManager(QObject):
             self.server_error.emit(str(e))
 
     def _run_server(self):
-        """Thread target — runs the uvicorn event loop."""
         try:
             self._server.run()
         except Exception as e:
             logger.error(f"Server thread error: {e}", exc_info=True)
 
     def stop_server(self):
-        """Signal the server to shut down and wait for the thread to finish."""
         was_running = self.is_running()
 
         if self._server is not None:
@@ -96,7 +91,6 @@ class ServerManager(QObject):
         return _state.transcription_active
 
     def cleanup(self):
-        """Force stop — called during application shutdown."""
         if self.is_running():
             from core.server.api_server import _state
             _state.cancel_event.set()

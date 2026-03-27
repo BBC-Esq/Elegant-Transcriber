@@ -325,7 +325,6 @@ class BatchProcessor(QThread):
             all_chunk_words.append(word_segs or [])
             had_overlap.append(has_overlap)
 
-        # Stitch at word level, then group into display segments
         stitched_words = stitch_timestamp_segments(all_chunk_words, had_overlap)
         if stitched_words:
             return self._group_words_into_segments(
@@ -347,7 +346,6 @@ class BatchProcessor(QThread):
 
     def _extract_word_timestamps(self, output, time_offset: float
                                   ) -> List[Tuple[float, float, str]]:
-        """Extract word-level timestamps from model output (ungrouped)."""
         segments = []
         if not output or not isinstance(output, (list, tuple)):
             return segments

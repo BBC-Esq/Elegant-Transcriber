@@ -1,5 +1,3 @@
-"""FastAPI server for audio transcription with flexible input formats."""
-
 import asyncio
 import base64
 import io
@@ -29,9 +27,6 @@ logger = logging.getLogger(__name__)
 SR = 16000
 
 
-# ---------------------------------------------------------------------------
-# App state — injected by ServerManager before uvicorn starts
-# ---------------------------------------------------------------------------
 
 class AppState:
     model_manager: Any = None
@@ -52,10 +47,6 @@ def set_app_state(*, model_manager, default_settings: TranscriptionSettings):
     _state.transcription_active = False
 
 
-# ---------------------------------------------------------------------------
-# Work item for the queue
-# ---------------------------------------------------------------------------
-
 @dataclass
 class WorkItem:
     audio: np.ndarray
@@ -64,12 +55,7 @@ class WorkItem:
     future: asyncio.Future
 
 
-# ---------------------------------------------------------------------------
-# Audio normalisation helpers
-# ---------------------------------------------------------------------------
-
 def _resample(audio: np.ndarray, orig_sr: int, target_sr: int = SR) -> np.ndarray:
-    """Resample audio to target sample rate using linear interpolation."""
     if orig_sr == target_sr:
         return audio
     ratio = target_sr / orig_sr
@@ -79,7 +65,6 @@ def _resample(audio: np.ndarray, orig_sr: int, target_sr: int = SR) -> np.ndarra
 
 
 def _to_mono_float32(audio: np.ndarray) -> np.ndarray:
-    """Ensure audio is mono float32 in [-1, 1]."""
     if audio.ndim > 1:
         if audio.shape[0] <= audio.shape[-1]:
             audio = audio.mean(axis=0)
@@ -95,7 +80,6 @@ def _to_mono_float32(audio: np.ndarray) -> np.ndarray:
 
 
 def _load_audio_from_file(path: str) -> np.ndarray:
-    """Load audio file using PyAV (same as batch_processor.load_audio)."""
     import av
     container = av.open(path)
     try:
@@ -113,7 +97,6 @@ def _load_audio_from_file(path: str) -> np.ndarray:
 
 
 def _detect_format(filename: Optional[str], audio_format: str) -> str:
-    """Return normalised format string."""
     if audio_format and audio_format != "auto":
         return audio_format
 
@@ -140,7 +123,6 @@ def normalize_audio(
     sample_rate: int = SR,
     dtype: str = "float32",
 ) -> np.ndarray:
-    """Convert any supported input to float32 mono numpy array at 16 kHz."""
     fmt = _detect_format(filename, audio_format)
 
     if fmt == "numpy":
@@ -165,7 +147,6 @@ def normalize_audio(
         audio = _to_mono_float32(audio)
         return _resample(audio, sample_rate, SR)
 
-    # Default: audio file — write to temp, load with PyAV
     suffix = Path(filename).suffix if filename else ".wav"
     tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
     try:
@@ -179,12 +160,7 @@ def normalize_audio(
             pass
 
 
-# ---------------------------------------------------------------------------
-# Server-side transcription worker (plain class, not QThread)
-# ---------------------------------------------------------------------------
-
 class ServerTranscriptionWorker:
-    """Mirrors BatchProcessor transcription methods without Qt dependencies."""
 
     def __init__(self, settings: TranscriptionSettings, model_info: Dict[str, Any],
                  cancel_event: Event):
@@ -194,7 +170,6 @@ class ServerTranscriptionWorker:
         self.cancel_event = cancel_event
 
     def transcribe(self, model, audio: np.ndarray) -> Dict[str, Any]:
-        """Run transcription and return result dict."""
         use_timestamps = (
             self.settings.word_timestamps and self.model_type != "canary"
         )
@@ -215,8 +190,6 @@ class ServerTranscriptionWorker:
         else:
             text = self._transcribe_text(model, audio)
             return {"text": text, "segments": []}
-
-    # -- chunking --
 
     def _get_chunks(self, audio: np.ndarray) -> List[Tuple[np.ndarray, float, bool]]:
         seg_len = self.settings.segment_length
@@ -246,8 +219,6 @@ class ServerTranscriptionWorker:
 
         return chunks
 
-    # -- Parakeet text-only --
-
     def _transcribe_text(self, model, audio: np.ndarray) -> str:
         chunks = self._get_chunks(audio)
         all_texts = []
@@ -262,8 +233,6 @@ class ServerTranscriptionWorker:
             all_texts.append(self._extract_text(output))
             had_overlap.append(has_overlap)
         return stitch_texts(all_texts, had_overlap, self.model_type)
-
-    # -- Canary --
 
     def _transcribe_canary(self, model, audio: np.ndarray) -> str:
         import soundfile as sf
@@ -306,8 +275,6 @@ class ServerTranscriptionWorker:
 
         return stitch_texts(all_texts, had_overlap, self.model_type)
 
-    # -- Parakeet with timestamps --
-
     def _transcribe_with_timestamps(
         self, model, audio: np.ndarray
     ) -> List[Tuple[float, float, str]]:
@@ -338,8 +305,6 @@ class ServerTranscriptionWorker:
             )
         return []
 
-    # -- extraction helpers --
-
     @staticmethod
     def _extract_text(output) -> str:
         if not output:
@@ -356,7 +321,6 @@ class ServerTranscriptionWorker:
     def _extract_word_timestamps(
         self, output, time_offset: float
     ) -> List[Tuple[float, float, str]]:
-        """Extract word-level timestamps from model output (ungrouped)."""
         segments = []
         if not output or not isinstance(output, (list, tuple)):
             return segments
@@ -407,12 +371,7 @@ class ServerTranscriptionWorker:
         return grouped
 
 
-# ---------------------------------------------------------------------------
-# Queue worker
-# ---------------------------------------------------------------------------
-
 async def _queue_worker():
-    """Process transcription requests one at a time."""
     while True:
         item: WorkItem = await _state.queue.get()
         _state.transcription_active = True
@@ -431,7 +390,6 @@ async def _queue_worker():
 
 
 def _do_transcription(item: WorkItem) -> Dict[str, Any]:
-    """Blocking transcription — runs in thread pool."""
     start_time = time.perf_counter()
 
     model_key = item.settings.model_key
@@ -455,17 +413,12 @@ def _do_transcription(item: WorkItem) -> Dict[str, Any]:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Resolve model key from user-supplied name + precision
-# ---------------------------------------------------------------------------
-
 def _resolve_model_key(
     model_name: Optional[str],
     precision: Optional[str],
     device: Optional[str],
     defaults: TranscriptionSettings,
 ) -> Tuple[str, Dict[str, Any]]:
-    """Return (model_key, model_info) from user params or defaults."""
     target_name = model_name or ALL_MODELS[defaults.model_key]["name"]
     target_prec = precision if precision else ALL_MODELS[defaults.model_key]["precision"]
 
@@ -473,7 +426,6 @@ def _resolve_model_key(
     if key in ALL_MODELS:
         return key, ALL_MODELS[key]
 
-    # Try to find a matching model by name alone
     for k, v in ALL_MODELS.items():
         if v["name"] == target_name:
             return k, v
@@ -493,7 +445,6 @@ def _build_settings(
     segment_length: Optional[int],
     segment_duration: Optional[int],
 ) -> Tuple[TranscriptionSettings, Dict[str, Any]]:
-    """Merge user-supplied params with defaults, return (settings, model_info)."""
     defaults = _state.default_settings
 
     model_key, model_info = _resolve_model_key(model_name, precision, device, defaults)
@@ -511,13 +462,9 @@ def _build_settings(
     return settings, model_info
 
 
-# ---------------------------------------------------------------------------
-# Pydantic model for JSON endpoint
-# ---------------------------------------------------------------------------
-
 class RawTranscribeRequest(BaseModel):
-    audio_data: str  # base64-encoded
-    audio_format: str = "numpy"  # numpy, tensor, pcm, wav, mp3, etc.
+    audio_data: str
+    audio_format: str = "numpy"
     sample_rate: int = 16000
     dtype: str = "float32"
     model: Optional[str] = None
@@ -529,21 +476,15 @@ class RawTranscribeRequest(BaseModel):
     segment_duration: Optional[int] = None
 
 
-# ---------------------------------------------------------------------------
-# FastAPI app factory
-# ---------------------------------------------------------------------------
-
 def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # Startup
         _state.queue = asyncio.Queue()
         _state.cancel_event.clear()
         _state.worker_task = asyncio.create_task(_queue_worker())
         logger.info("Transcription queue worker started")
         yield
-        # Shutdown
         if _state.worker_task:
             _state.worker_task.cancel()
             try:
@@ -579,8 +520,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    # -- routes --
 
     @app.get("/health")
     async def health():
@@ -623,11 +562,6 @@ def create_app() -> FastAPI:
         segment_length: Optional[int] = Form(None),
         segment_duration: Optional[int] = Form(None),
     ):
-        """Transcribe audio from a multipart file upload.
-
-        Accepts standard audio files (.mp3, .wav, .flac, etc.),
-        numpy arrays (.npy), PyTorch tensors (.pt), or raw PCM data.
-        """
         try:
             data = await audio.read()
             if not data:
@@ -678,11 +612,6 @@ def create_app() -> FastAPI:
 
     @app.post("/transcribe/raw")
     async def transcribe_raw(request: RawTranscribeRequest):
-        """Transcribe audio from base64-encoded data in a JSON body.
-
-        Supports numpy arrays (np.save → base64), PyTorch tensors
-        (torch.save → base64), raw PCM bytes, or full audio file bytes.
-        """
         try:
             data = base64.b64decode(request.audio_data)
             if not data:

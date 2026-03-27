@@ -92,8 +92,6 @@ class MainWindow(QWidget):
         self.server_manager.server_stopped.connect(self._on_server_stopped)
         self.server_manager.server_error.connect(self._on_server_error)
 
-    # -- directory / transcription --
-
     @Slot()
     def _select_directory(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Directory")
@@ -187,8 +185,6 @@ class MainWindow(QWidget):
             selected_extensions=self.settings_widget.get_selected_extensions(),
         )
 
-    # -- processing state --
-
     def _on_processing_started(self):
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
@@ -220,8 +216,6 @@ class MainWindow(QWidget):
     def _update_progress(self, current: int, total: int, message: str):
         self.progress_label.setText(f"Status: {message}")
 
-    # -- server mode --
-
     @Slot()
     def _toggle_server(self):
         if self.server_manager.is_running():
@@ -230,7 +224,6 @@ class MainWindow(QWidget):
             self._start_server()
 
     def _start_server(self):
-        # Block if GUI transcription is in progress
         if (self.transcription_service._processor
                 and self.transcription_service._processor.isRunning()):
             QMessageBox.warning(
@@ -239,7 +232,6 @@ class MainWindow(QWidget):
             )
             return
 
-        # Show port dialog
         port = self._show_port_dialog()
         if port is None:
             return
@@ -266,7 +258,6 @@ class MainWindow(QWidget):
         self.server_manager.stop_server()
 
     def _show_port_dialog(self) -> int | None:
-        """Show a dialog to configure the server port. Returns port or None."""
         saved_port = self._qsettings.value("server_port", 7862, type=int)
 
         dialog = QDialog(self)
@@ -317,8 +308,6 @@ class MainWindow(QWidget):
     def _on_server_error(self, message: str):
         self._on_server_stopped()
         QMessageBox.critical(self, "Server Error", message)
-
-    # -- settings persistence --
 
     def _load_settings(self):
         saved_recursive = self._qsettings.value("recursive", False, type=bool)

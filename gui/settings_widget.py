@@ -202,7 +202,6 @@ class SettingsWidget(QGroupBox):
         model_type = self._get_model_type(model_name)
         is_canary = model_type == "canary"
 
-        # Canary: max chunk 40s, no timestamps
         if is_canary:
             self.segment_slider.setMaximum(CANARY_MAX_CHUNK_LENGTH)
             if self.segment_slider.value() > CANARY_MAX_CHUNK_LENGTH:
