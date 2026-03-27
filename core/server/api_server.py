@@ -20,7 +20,8 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from config.constants import ALL_MODELS, CANARY_MAX_CHUNK_LENGTH
+from config.constants import ALL_MODELS, CANARY_MAX_CHUNK_LENGTH, CHUNK_OVERLAP_SECONDS
+from core.transcription.stitching import stitch_texts, stitch_timestamp_segments
 from config.settings import TranscriptionSettings
 
 logger = logging.getLogger(__name__)
@@ -217,27 +218,41 @@ class ServerTranscriptionWorker:
 
     # -- chunking --
 
-    def _get_chunks(self, audio: np.ndarray) -> List[Tuple[np.ndarray, float]]:
+    def _get_chunks(self, audio: np.ndarray) -> List[Tuple[np.ndarray, float, bool]]:
         seg_len = self.settings.segment_length
         if self.model_type == "canary":
             seg_len = min(seg_len, CANARY_MAX_CHUNK_LENGTH)
         segment_samples = seg_len * SR
+        overlap_samples = CHUNK_OVERLAP_SECONDS * SR
         audio_length = len(audio)
-        if audio_length > segment_samples:
-            chunks = []
-            for i in range((audio_length + segment_samples - 1) // segment_samples):
-                start = i * segment_samples
-                end = min(start + segment_samples, audio_length)
-                chunks.append((audio[start:end], start / SR))
-            return chunks
-        return [(audio, 0.0)]
+
+        if audio_length <= segment_samples:
+            return [(audio, 0.0, False)]
+
+        chunks = []
+        start = 0
+        while start < audio_length:
+            end = min(start + segment_samples, audio_length)
+            is_not_first = start > 0
+            chunks.append((audio[start:end], start / SR, is_not_first))
+
+            next_start = start + segment_samples - overlap_samples
+            if next_start >= audio_length:
+                break
+            if audio_length - next_start < overlap_samples * 2:
+                chunks.append((audio[next_start:audio_length], next_start / SR, True))
+                break
+            start = next_start
+
+        return chunks
 
     # -- Parakeet text-only --
 
     def _transcribe_text(self, model, audio: np.ndarray) -> str:
         chunks = self._get_chunks(audio)
         all_texts = []
-        for chunk_audio, _ in chunks:
+        had_overlap = []
+        for chunk_audio, _, has_overlap in chunks:
             if self.cancel_event.is_set():
                 break
             with torch.inference_mode():
@@ -245,7 +260,8 @@ class ServerTranscriptionWorker:
                     [chunk_audio], batch_size=1, timestamps=False, verbose=False,
                 )
             all_texts.append(self._extract_text(output))
-        return " ".join(t for t in all_texts if t)
+            had_overlap.append(has_overlap)
+        return stitch_texts(all_texts, had_overlap, self.model_type)
 
     # -- Canary --
 
@@ -254,10 +270,11 @@ class ServerTranscriptionWorker:
 
         chunks = self._get_chunks(audio)
         all_texts = []
+        had_overlap = []
         temp_files = []
 
         try:
-            for chunk_audio, _ in chunks:
+            for chunk_audio, _, has_overlap in chunks:
                 if self.cancel_event.is_set():
                     break
                 tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
@@ -279,6 +296,7 @@ class ServerTranscriptionWorker:
                     )
                 txt = model.tokenizer.ids_to_text(answer_ids[0].cpu()).strip()
                 all_texts.append(txt)
+                had_overlap.append(has_overlap)
         finally:
             for tf_path in temp_files:
                 try:
@@ -286,7 +304,7 @@ class ServerTranscriptionWorker:
                 except OSError:
                     pass
 
-        return " ".join(t for t in all_texts if t)
+        return stitch_texts(all_texts, had_overlap, self.model_type)
 
     # -- Parakeet with timestamps --
 
@@ -294,8 +312,9 @@ class ServerTranscriptionWorker:
         self, model, audio: np.ndarray
     ) -> List[Tuple[float, float, str]]:
         chunks = self._get_chunks(audio)
-        all_segments = []
-        for chunk_audio, time_offset in chunks:
+        all_chunk_words = []
+        had_overlap = []
+        for chunk_audio, time_offset, has_overlap in chunks:
             if self.cancel_event.is_set():
                 break
             with torch.inference_mode():
@@ -303,15 +322,21 @@ class ServerTranscriptionWorker:
                     [chunk_audio], batch_size=1, timestamps=True,
                     return_hypotheses=True, verbose=False,
                 )
-            chunk_segs = self._extract_timestamp_segments(hypotheses, time_offset)
-            if chunk_segs:
-                all_segments.extend(chunk_segs)
-            else:
+            word_segs = self._extract_word_timestamps(hypotheses, time_offset)
+            if not word_segs:
                 txt = self._extract_text(hypotheses)
                 if txt:
                     chunk_end = time_offset + len(chunk_audio) / SR
-                    all_segments.append((time_offset, chunk_end, txt))
-        return all_segments
+                    word_segs = [(time_offset, chunk_end, txt)]
+            all_chunk_words.append(word_segs or [])
+            had_overlap.append(has_overlap)
+
+        stitched_words = stitch_timestamp_segments(all_chunk_words, had_overlap)
+        if stitched_words:
+            return self._group_words_into_segments(
+                stitched_words, max_duration=float(self.settings.segment_duration)
+            )
+        return []
 
     # -- extraction helpers --
 
@@ -328,9 +353,10 @@ class ServerTranscriptionWorker:
             return str(first).strip()
         return str(output).strip()
 
-    def _extract_timestamp_segments(
+    def _extract_word_timestamps(
         self, output, time_offset: float
     ) -> List[Tuple[float, float, str]]:
+        """Extract word-level timestamps from model output (ungrouped)."""
         segments = []
         if not output or not isinstance(output, (list, tuple)):
             return segments
@@ -350,10 +376,6 @@ class ServerTranscriptionWorker:
             )
             if text.strip():
                 segments.append((start, end, text.strip()))
-        if segments:
-            segments = self._group_words_into_segments(
-                segments, max_duration=float(self.settings.segment_duration)
-            )
         return segments
 
     @staticmethod

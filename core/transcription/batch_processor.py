@@ -12,7 +12,8 @@ import torch
 import av
 
 from config.settings import TranscriptionSettings
-from config.constants import CANARY_MAX_CHUNK_LENGTH
+from config.constants import CANARY_MAX_CHUNK_LENGTH, CHUNK_OVERLAP_SECONDS
+from core.transcription.stitching import stitch_texts, stitch_timestamp_segments
 
 logger = logging.getLogger(__name__)
 
@@ -214,22 +215,35 @@ class BatchProcessor(QThread):
         if self.model_type == "canary":
             seg_len = min(seg_len, CANARY_MAX_CHUNK_LENGTH)
         segment_samples = seg_len * SR
+        overlap_samples = CHUNK_OVERLAP_SECONDS * SR
         audio_length = len(audio)
-        if audio_length > segment_samples:
-            num_chunks = (audio_length + segment_samples - 1) // segment_samples
-            chunks = []
-            for i in range(num_chunks):
-                start = i * segment_samples
-                end = min(start + segment_samples, audio_length)
-                chunks.append((audio[start:end], start / SR))
-            return chunks
-        return [(audio, 0.0)]
+
+        if audio_length <= segment_samples:
+            return [(audio, 0.0, False)]
+
+        chunks = []
+        start = 0
+        while start < audio_length:
+            end = min(start + segment_samples, audio_length)
+            is_not_first = start > 0
+            chunks.append((audio[start:end], start / SR, is_not_first))
+
+            next_start = start + segment_samples - overlap_samples
+            if next_start >= audio_length:
+                break
+            if audio_length - next_start < overlap_samples * 2:
+                chunks.append((audio[next_start:audio_length], next_start / SR, True))
+                break
+            start = next_start
+
+        return chunks
 
     def _transcribe_text(self, model, audio: np.ndarray, filename: str,
                          file_idx: int, total_files: int) -> str:
         chunks = self._get_chunks(audio)
         all_texts = []
-        for i, (chunk_audio, _offset) in enumerate(chunks):
+        had_overlap = []
+        for i, (chunk_audio, _offset, has_overlap) in enumerate(chunks):
             if self.stop_requested.is_set():
                 break
             self._emit_progress(file_idx, total_files, i, len(chunks), filename)
@@ -237,8 +251,10 @@ class BatchProcessor(QThread):
                 output = model.transcribe(
                     [chunk_audio], batch_size=1, timestamps=False, verbose=False,
                 )
-            all_texts.append(self._extract_text(output))
-        return " ".join(t for t in all_texts if t)
+            txt = self._extract_text(output)
+            all_texts.append(txt)
+            had_overlap.append(has_overlap)
+        return stitch_texts(all_texts, had_overlap, self.model_type)
 
     def _transcribe_canary(self, model, audio: np.ndarray, filename: str,
                            file_idx: int, total_files: int) -> str:
@@ -246,10 +262,11 @@ class BatchProcessor(QThread):
 
         chunks = self._get_chunks(audio)
         all_texts = []
+        had_overlap = []
         temp_files = []
 
         try:
-            for i, (chunk_audio, _offset) in enumerate(chunks):
+            for i, (chunk_audio, _offset, has_overlap) in enumerate(chunks):
                 if self.stop_requested.is_set():
                     break
                 self._emit_progress(file_idx, total_files, i, len(chunks), filename)
@@ -274,6 +291,7 @@ class BatchProcessor(QThread):
 
                 txt = model.tokenizer.ids_to_text(answer_ids[0].cpu()).strip()
                 all_texts.append(txt)
+                had_overlap.append(has_overlap)
         finally:
             for tf_path in temp_files:
                 try:
@@ -281,14 +299,15 @@ class BatchProcessor(QThread):
                 except OSError:
                     pass
 
-        return " ".join(t for t in all_texts if t)
+        return stitch_texts(all_texts, had_overlap, self.model_type)
 
     def _transcribe_with_timestamps(self, model, audio: np.ndarray, filename: str,
                                      file_idx: int, total_files: int
                                      ) -> List[Tuple[float, float, str]]:
         chunks = self._get_chunks(audio)
-        all_segments = []
-        for i, (chunk_audio, time_offset) in enumerate(chunks):
+        all_chunk_words = []
+        had_overlap = []
+        for i, (chunk_audio, time_offset, has_overlap) in enumerate(chunks):
             if self.stop_requested.is_set():
                 break
             self._emit_progress(file_idx, total_files, i, len(chunks), filename)
@@ -297,15 +316,22 @@ class BatchProcessor(QThread):
                     [chunk_audio], batch_size=1, timestamps=True,
                     return_hypotheses=True, verbose=False,
                 )
-            chunk_segs = self._extract_timestamp_segments(hypotheses, time_offset)
-            if chunk_segs:
-                all_segments.extend(chunk_segs)
-            else:
+            word_segs = self._extract_word_timestamps(hypotheses, time_offset)
+            if not word_segs:
                 txt = self._extract_text(hypotheses)
                 if txt:
                     chunk_end = time_offset + len(chunk_audio) / SR
-                    all_segments.append((time_offset, chunk_end, txt))
-        return all_segments
+                    word_segs = [(time_offset, chunk_end, txt)]
+            all_chunk_words.append(word_segs or [])
+            had_overlap.append(has_overlap)
+
+        # Stitch at word level, then group into display segments
+        stitched_words = stitch_timestamp_segments(all_chunk_words, had_overlap)
+        if stitched_words:
+            return self._group_words_into_segments(
+                stitched_words, max_duration=float(self.settings.segment_duration)
+            )
+        return []
 
     def _extract_text(self, output) -> str:
         if not output:
@@ -319,8 +345,9 @@ class BatchProcessor(QThread):
             return str(first).strip()
         return str(output).strip()
 
-    def _extract_timestamp_segments(self, output, time_offset: float
-                                     ) -> List[Tuple[float, float, str]]:
+    def _extract_word_timestamps(self, output, time_offset: float
+                                  ) -> List[Tuple[float, float, str]]:
+        """Extract word-level timestamps from model output (ungrouped)."""
         segments = []
         if not output or not isinstance(output, (list, tuple)):
             return segments
@@ -339,10 +366,6 @@ class BatchProcessor(QThread):
             text = entry.get('word', '') or entry.get('char', '') or entry.get('segment', '')
             if text.strip():
                 segments.append((start, end, text.strip()))
-        if segments:
-            segments = self._group_words_into_segments(
-                segments, max_duration=float(self.settings.segment_duration)
-            )
         return segments
 
     def _group_words_into_segments(self, word_segments: List[Tuple[float, float, str]],

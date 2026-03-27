@@ -41,6 +41,7 @@ MODEL_TOOLTIPS = {
 }
 
 CANARY_MAX_CHUNK_LENGTH = 40
+CHUNK_OVERLAP_SECONDS = 7
 
 SUPPORTED_AUDIO_EXTENSIONS = [
     ".aac", ".amr", ".asf", ".avi", ".flac", ".m4a",
