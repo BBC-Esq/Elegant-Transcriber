@@ -5,7 +5,7 @@
 </div>
 
 ## 4x faster than the fastest Whisper implementation AND more accurate.
-- Batch transcribe multiple files recursively in directories or sub-directories.
+- Batch transcribe multiple files in a directory and optionally all sub-directories.
 - Optional timestamps with configurable segment intervals
 - Works on GPU (CUDA) and CPU, Windows or Linux
 - Supported file types: AAC, AMR, ASF, AVI, FLAC, M4A, MKV, MP3, MP4, WAV, WEBM, WMA

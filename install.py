@@ -276,7 +276,7 @@ def main():
         sys.exit(1)
 
     print(f"\n\033[92mStep 2: Installing NeMo toolkit (with all dependencies):\033[0m")
-    success_nemo, attempts_nemo = install_libraries(["nemo_toolkit[asr]"])
+    success_nemo, attempts_nemo = install_libraries(["nemo_toolkit[asr]>=2.7.0,<2.8.0"])
     if not success_nemo:
         print(f"\033[91mNeMo installation failed after {attempts_nemo} attempts.\033[0m")
         sys.exit(1)

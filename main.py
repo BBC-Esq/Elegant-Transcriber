@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore", message=r".*Redirects are currently not suppor
 
 for _name in ["nemo", "nemo.collections", "nemo.utils", "nemo.core",
               "lightning", "lightning_fabric", "pytorch_lightning",
-              "nemo_logger", "nv_one_logger", "wandb", "numba"]:
+              "nemo_logger", "nv_one_logger", "wandb", "numba", "httpx"]:
     logging.getLogger(_name).setLevel(logging.ERROR)
 
 from utils.cuda_setup import setup_cuda_paths
