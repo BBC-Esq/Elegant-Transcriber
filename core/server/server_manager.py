@@ -40,6 +40,7 @@ class ServerManager(QObject):
                 host="0.0.0.0",
                 port=port,
                 log_level="warning",
+                log_config=None,
                 access_log=False,
             )
             self._server = uvicorn.Server(config)
