@@ -15,15 +15,18 @@ __pycache__/
 .ruff_cache/
 
 # --- app runtime state ---
-logs/
+/logs/
 install.log
-config.yaml
+/config.yaml
 
 # --- model weights & test assets ---
-models/
+/models/
 /TEST FILES/
 /TEST_SINGLE/
 /TEST_MULTIPLE/
+
+# --- tests (kept local, not tracked) ---
+/tests/
 
 # --- IDE / editor / assistant ---
 .vscode/
