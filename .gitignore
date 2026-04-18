@@ -1,0 +1,47 @@
+# --- venv (installed in project root) ---
+/Lib/
+/Include/
+/Scripts/
+/share/
+pyvenv.cfg
+.lock
+
+# --- Python runtime ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- app runtime state ---
+logs/
+install.log
+config.yaml
+
+# --- model weights & test assets ---
+models/
+/TEST FILES/
+/TEST_SINGLE/
+/TEST_MULTIPLE/
+
+# --- IDE / editor / assistant ---
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- packaging / build ---
+build/
+dist/
+*.egg-info/
+*.spec
+installer/
+installer-output/
