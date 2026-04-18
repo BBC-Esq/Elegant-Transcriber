@@ -102,6 +102,11 @@ app_libs = [
     "sounddevice",
     "pynput",
     "nltk",
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    "pytest",
+    "requests",
 ]
 
 version_overrides = [

@@ -45,6 +45,8 @@ class ConfigManager:
             ".aac", ".amr", ".asf", ".avi", ".flac", ".m4a",
             ".mkv", ".mp3", ".mp4", ".wav", ".webm", ".wma",
         ],
+        "server_mode_enabled": False,
+        "server_port": 8765,
     }
 
     VALIDATION_SCHEMA = {
@@ -61,6 +63,8 @@ class ConfigManager:
         "single_file_output_mode": {"type": str, "options": "single_file_output_modes"},
         "output_directory": {"type": str},
         "batch_recursive": {"type": bool},
+        "server_mode_enabled": {"type": bool},
+        "server_port": {"type": int, "validator": "_validate_server_port"},
     }
 
     def __init__(self):
@@ -142,6 +146,11 @@ class ConfigManager:
         if isinstance(value, int) and 1 <= value <= 90:
             return value
         return self.DEFAULT_CONFIG["segment_duration"]
+
+    def _validate_server_port(self, value: Any) -> int:
+        if isinstance(value, int) and 1024 <= value <= 65535:
+            return value
+        return self.DEFAULT_CONFIG["server_port"]
 
     def load_config(self) -> dict[str, Any]:
         return copy.deepcopy(self._ensure_cache())
