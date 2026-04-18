@@ -26,7 +26,9 @@ from core.audio.device_utils import find_device_id_by_name
 from core.hotkeys import GlobalHotkey
 from core.output.writers import write_output
 from core.monitoring.collectors import MetricsCollector
+from core.server.server_manager import ServerManager
 from config.manager import config_manager
+from config.server_settings import TranscriptionSettings as ServerTranscriptionSettings
 from gui.styles import update_button_property
 from gui.clipboard_window import ClipboardSideWindow
 from gui.file_panel import FilePanelWindow
@@ -218,6 +220,13 @@ class MainWindow(QMainWindow):
 
         self._metrics_collector = MetricsCollector(interval_ms=1000)
         self._metrics_collector.metrics_updated.connect(self._on_metrics_updated)
+
+        self._server_manager = ServerManager()
+        self._server_manager.server_started.connect(self._on_server_started)
+        self._server_manager.server_stopped.connect(self._on_server_stopped)
+        self._server_manager.server_error.connect(self._on_server_error)
+        self._server_mode_enabled: bool = False
+        self._server_port: int = int(config_manager.get_value("server_port", 8765))
 
         self._build_ui()
         self._setup_connections()
@@ -698,6 +707,10 @@ class MainWindow(QMainWindow):
             "include_timestamps": config_manager.get_value("include_timestamps", False),
             "segment_duration": config_manager.get_value("segment_duration", 10),
         }
+        server_settings = {
+            "server_mode_enabled": self._server_mode_enabled,
+            "server_port": self._server_port,
+        }
         dlg = SettingsDialog(
             parent=self,
             cuda_available=self.cuda_available,
@@ -706,16 +719,79 @@ class MainWindow(QMainWindow):
             current_audio_device=current_audio,
             current_parakeet_settings=parakeet_settings,
             current_ext_checked=self.file_panel.get_ext_checked(),
+            current_server_settings=server_settings,
+            is_busy_check=(lambda: self.controller.is_transcribing() or self.controller.is_batch_processing()),
         )
         dlg.model_update_requested.connect(self._on_settings_update_requested)
         dlg.audio_device_changed.connect(self._on_audio_device_changed)
         dlg.parakeet_settings_changed.connect(self._on_parakeet_settings_changed)
         dlg.file_types_changed.connect(self._on_file_types_changed)
+        dlg.server_mode_changed.connect(self._on_server_mode_changed)
         dlg.exec()
 
     @Slot(str, str, str)
     def _on_settings_update_requested(self, model: str, precision: str, device: str) -> None:
         self.controller.update_model(model, precision, device)
+
+    @Slot(bool, int)
+    def _on_server_mode_changed(self, enabled: bool, port: int) -> None:
+        self._server_port = port
+        config_manager.set_value("server_port", port)
+
+        if enabled and not self._server_manager.is_running():
+            defaults = ServerTranscriptionSettings(
+                model_key=(
+                    ModelMetadata.resolve_model_key(
+                        self.loaded_model_settings.get("model_name", "Parakeet TDT 0.6B v2"),
+                        self.loaded_model_settings.get("precision", "bfloat16"),
+                    )
+                    or "Parakeet TDT 0.6B v2 - bfloat16"
+                ),
+                device=self.loaded_model_settings.get("device_type", "cuda"),
+                segment_length=int(config_manager.get_value("segment_length", 90)),
+                segment_duration=int(config_manager.get_value("segment_duration", 10)),
+                output_format=config_manager.get_value("output_format", "txt"),
+                word_timestamps=bool(config_manager.get_value("include_timestamps", False)),
+            )
+            self._server_manager.start_server(port, self.controller.model_manager, defaults)
+        elif not enabled and self._server_manager.is_running():
+            self._server_manager.stop_server()
+
+        self._server_mode_enabled = enabled
+        config_manager.set_value("server_mode_enabled", enabled)
+        self._apply_server_mode_ui(enabled)
+
+    def _apply_server_mode_ui(self, enabled: bool) -> None:
+        self.clipboard_window.set_server_mode_enabled(enabled)
+        self.file_panel.set_server_mode_enabled(enabled)
+
+        if enabled:
+            self.record_button.setEnabled(False)
+            self.record_button.setToolTip(
+                "<qt>The voice recorder is disabled while<br>"
+                "the program is running in Server Mode.</qt>"
+            )
+        else:
+            self.record_button.setEnabled(True)
+            self.record_button.setToolTip("Click or press F9 to toggle recording")
+
+    @Slot(int)
+    def _on_server_started(self, port: int) -> None:
+        logger.info(f"Server listening on port {port}")
+        self._update_model_status(f"Server running on port {port}")
+
+    @Slot()
+    def _on_server_stopped(self) -> None:
+        logger.info("Server stopped")
+        self._show_current_model_status()
+
+    @Slot(str)
+    def _on_server_error(self, message: str) -> None:
+        logger.error(f"Server error: {message}")
+        QMessageBox.critical(self, "Server Error", f"Failed to start server:\n\n{message}")
+        self._server_mode_enabled = False
+        config_manager.set_value("server_mode_enabled", False)
+        self._apply_server_mode_ui(False)
 
     def _resolve_audio_device(self) -> int | None:
         name = self.settings.value(SETTINGS_AUDIO_DEVICE_NAME, "")
@@ -1092,6 +1168,9 @@ class MainWindow(QMainWindow):
         self._sync_side_windows()
 
     def closeEvent(self, event):
+        if self._server_manager.is_running():
+            self._server_manager.cleanup()
+
         if self.controller.is_transcribing() or self.controller.is_batch_processing():
             reply = QMessageBox.question(
                 self,

@@ -44,21 +44,21 @@ class ClipboardSideWindow(QWidget):
         controls = QHBoxLayout()
         controls.setSpacing(10)
 
-        copy_btn = QPushButton("Copy")
-        copy_btn.setObjectName("copyButton")
-        copy_btn.setFixedHeight(32)
-        copy_btn.setMinimumWidth(80)
-        copy_btn.setToolTip("Copy the current text to your clipboard")
-        copy_btn.clicked.connect(self._copy_to_clipboard)
-        controls.addWidget(copy_btn)
+        self._copy_btn = QPushButton("Copy")
+        self._copy_btn.setObjectName("copyButton")
+        self._copy_btn.setFixedHeight(32)
+        self._copy_btn.setMinimumWidth(80)
+        self._copy_btn.setToolTip("Copy the current text to your clipboard")
+        self._copy_btn.clicked.connect(self._copy_to_clipboard)
+        controls.addWidget(self._copy_btn)
 
-        clear_btn = QPushButton("Clear")
-        clear_btn.setObjectName("clearButton")
-        clear_btn.setFixedHeight(32)
-        clear_btn.setMinimumWidth(80)
-        clear_btn.setToolTip("Clear the clipboard panel")
-        clear_btn.clicked.connect(self._text_display.clear)
-        controls.addWidget(clear_btn)
+        self._clear_btn = QPushButton("Clear")
+        self._clear_btn.setObjectName("clearButton")
+        self._clear_btn.setFixedHeight(32)
+        self._clear_btn.setMinimumWidth(80)
+        self._clear_btn.setToolTip("Clear the clipboard panel")
+        self._clear_btn.clicked.connect(self._text_display.clear)
+        controls.addWidget(self._clear_btn)
 
         controls.addStretch(1)
 
@@ -283,6 +283,21 @@ class ClipboardSideWindow(QWidget):
         self.user_closed.emit()
         event.ignore()
         self.hide()
+
+    def set_server_mode_enabled(self, enabled: bool) -> None:
+        tip = (
+            "<qt>Clipboard is disabled while the<br>"
+            "program is running in Server Mode.<br>"
+            "Nothing transcribed via the server<br>"
+            "is written to the system clipboard.</qt>"
+            if enabled else ""
+        )
+        self._text_display.setEnabled(not enabled)
+        self._copy_btn.setEnabled(not enabled)
+        self._clear_btn.setEnabled(not enabled)
+        self._append_checkbox.setEnabled(not enabled)
+        for w in (self._text_display, self._copy_btn, self._clear_btn, self._append_checkbox):
+            w.setToolTip(tip)
 
     @Slot()
     def _request_dock(self) -> None:

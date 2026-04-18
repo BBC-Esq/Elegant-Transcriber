@@ -307,6 +307,24 @@ class FilePanelWindow(QWidget):
     def set_ext_checked(self, checked: dict[str, bool]) -> None:
         self._ext_checked = dict(checked)
 
+    def set_server_mode_enabled(self, enabled: bool) -> None:
+        tip = (
+            "<qt>File transcription is disabled<br>"
+            "while the program is running in<br>"
+            "Server Mode. All transcription<br>"
+            "requests come through the HTTP API.</qt>"
+            if enabled else ""
+        )
+        widgets = [
+            self._mode_toggle, self._single_label, self._multi_label,
+            self._recursive_cb, self._file_types_btn, self._select_btn,
+            self._path_label, self._format_combo, self._output_mode,
+            self._custom_dir_btn, self._start_btn, self._stop_btn,
+        ]
+        for w in widgets:
+            w.setEnabled(not enabled)
+            w.setToolTip(tip)
+
     def set_timestamps_supported(self, supported: bool) -> None:
         self._timestamps_supported = bool(supported)
         model = self._format_combo.model()

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal, Qt
-from PySide6.QtGui import QStandardItemModel
+from pathlib import Path
+
+from PySide6.QtCore import Signal, Qt, QUrl
+from PySide6.QtGui import QStandardItemModel, QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -16,10 +18,12 @@ from PySide6.QtWidgets import (
     QLabel,
 )
 
+from PySide6.QtWidgets import QMessageBox, QSpinBox as _QSpinBox
+
 from core.models.metadata import ModelMetadata
 from core.audio.device_utils import get_input_devices
 from gui.styles import update_button_property
-from gui.file_panel import FileTypesDialog, SUPPORTED_AUDIO_EXTENSIONS
+from gui.file_panel import FileTypesDialog, SUPPORTED_AUDIO_EXTENSIONS, ToggleSwitch
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -64,6 +68,7 @@ class SettingsDialog(QDialog):
     audio_device_changed = Signal(str, str)
     parakeet_settings_changed = Signal(object)
     file_types_changed = Signal(object)
+    server_mode_changed = Signal(bool, int)
 
     def __init__(
         self,
@@ -74,6 +79,8 @@ class SettingsDialog(QDialog):
         current_audio_device: dict[str, str] | None = None,
         current_parakeet_settings: dict | None = None,
         current_ext_checked: dict[str, bool] | None = None,
+        current_server_settings: dict | None = None,
+        is_busy_check=None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
@@ -89,6 +96,11 @@ class SettingsDialog(QDialog):
             "include_timestamps": False,
             "segment_duration": 10,
         }
+        self.current_server_settings = current_server_settings or {
+            "server_mode_enabled": False,
+            "server_port": 8765,
+        }
+        self._is_busy_check = is_busy_check or (lambda: False)
         self._last_model_type = ModelMetadata.get_model_type(
             self.current_settings.get("model_name", "Parakeet TDT 0.6B v2")
         )
@@ -180,6 +192,44 @@ class SettingsDialog(QDialog):
 
         right_column.addWidget(parakeet_group)
 
+        server_group = QGroupBox("Server Mode")
+        server_vbox = QVBoxLayout(server_group)
+        server_vbox.setContentsMargins(12, 10, 12, 10)
+        server_vbox.setSpacing(8)
+
+        toggle_row = QHBoxLayout()
+        toggle_row.setSpacing(6)
+        self._server_off_label = QLabel("Off")
+        self._server_off_label.setStyleSheet("font-size: 11px;")
+        toggle_row.addWidget(self._server_off_label)
+        self.server_mode_toggle = ToggleSwitch()
+        toggle_row.addWidget(self.server_mode_toggle)
+        self._server_on_label = QLabel("On")
+        self._server_on_label.setStyleSheet("font-size: 11px;")
+        toggle_row.addWidget(self._server_on_label)
+        toggle_row.addSpacing(16)
+        toggle_row.addWidget(QLabel("Port:"))
+        self.server_port_spin = _QSpinBox()
+        self.server_port_spin.setRange(1024, 65535)
+        self.server_port_spin.setToolTip(
+            "<qt>TCP port the HTTP API will bind to.<br>"
+            "Pick one that isn't in use on your<br>"
+            "machine (default 8765).</qt>"
+        )
+        toggle_row.addWidget(self.server_port_spin)
+        toggle_row.addStretch(1)
+        server_vbox.addLayout(toggle_row)
+
+        server_hint = QLabel(
+            "<qt>When On, the voice recorder, clipboard,<br>"
+            "file transcription, and other settings are<br>"
+            "controlled by HTTP clients.</qt>"
+        )
+        server_hint.setStyleSheet("color: #aaaaaa; font-size: 11px;")
+        server_vbox.addWidget(server_hint)
+
+        right_column.addWidget(server_group)
+
         file_types_row = QHBoxLayout()
         file_types_row.addStretch(1)
         self._file_types_btn = QPushButton("File Types...")
@@ -188,6 +238,16 @@ class SettingsDialog(QDialog):
         self._file_types_btn.setToolTip("Configure which audio/video file types to include in batch processing")
         self._file_types_btn.clicked.connect(self._open_file_types_dialog)
         file_types_row.addWidget(self._file_types_btn)
+
+        self._guide_btn = QPushButton("Guide")
+        self._guide_btn.setFixedHeight(28)
+        self._guide_btn.setFixedWidth(100)
+        self._guide_btn.setToolTip(
+            "<qt>Open the HTML user guide for the<br>"
+            "Server API in your default browser.</qt>"
+        )
+        self._guide_btn.clicked.connect(self._open_server_guide)
+        file_types_row.addWidget(self._guide_btn)
         right_column.addLayout(file_types_row)
 
         right_column.addStretch(1)
@@ -222,6 +282,8 @@ class SettingsDialog(QDialog):
         self.include_timestamps_cb.toggled.connect(self._check_for_changes)
         self.include_timestamps_cb.toggled.connect(self._update_segment_duration_enabled)
         self.segment_duration_spin.valueChanged.connect(self._check_for_changes)
+        self.server_mode_toggle.toggled.connect(self._check_for_changes)
+        self.server_port_spin.valueChanged.connect(self._check_for_changes)
 
     def _populate_from_settings(self) -> None:
         self.model_dropdown.setCurrentText(self.current_settings.get("model_name", "Parakeet TDT 0.6B v2"))
@@ -240,6 +302,18 @@ class SettingsDialog(QDialog):
         current_seg_dur = int(self.current_parakeet_settings.get("segment_duration", 10))
         self.segment_duration_spin.setValue(current_seg_dur)
         self._update_model_dependent_widgets()
+
+        self.server_mode_toggle.blockSignals(True)
+        self.server_mode_toggle.setChecked(
+            bool(self.current_server_settings.get("server_mode_enabled", False))
+        )
+        self.server_mode_toggle.blockSignals(False)
+        self.server_port_spin.blockSignals(True)
+        self.server_port_spin.setValue(
+            int(self.current_server_settings.get("server_port", 8765))
+        )
+        self.server_port_spin.blockSignals(False)
+        self._apply_server_mode_lock()
 
     def _select_audio_device(self) -> None:
         saved_name = self.current_audio_device.get("name", "")
@@ -393,11 +467,37 @@ class SettingsDialog(QDialog):
         }
         return current != self.current_parakeet_settings
 
+    def _server_settings_selection_changed(self) -> bool:
+        current = {
+            "server_mode_enabled": self.server_mode_toggle.isChecked(),
+            "server_port": self.server_port_spin.value(),
+        }
+        return current != self.current_server_settings
+
+    def _apply_server_mode_lock(self) -> None:
+        server_on = bool(self.current_server_settings.get("server_mode_enabled", False))
+        lock_tip = (
+            "<qt>Locked while the program is in<br>"
+            "Server Mode. Turn the Server Mode<br>"
+            "toggle Off to change this.</qt>"
+            if server_on else ""
+        )
+        locked = [
+            self.model_dropdown, self.device_dropdown, self.precision_dropdown,
+            self.audio_device_dropdown, self.include_timestamps_cb,
+            self.segment_duration_spin, self._file_types_btn,
+        ]
+        for w in locked:
+            w.setEnabled(not server_on)
+            if server_on:
+                w.setToolTip(lock_tip)
+
     def _check_for_changes(self) -> None:
         model_changed = self._model_settings_changed()
         audio_changed = self._audio_device_selection_changed()
         parakeet_changed = self._parakeet_settings_selection_changed()
-        has_changes = model_changed or audio_changed or parakeet_changed
+        server_changed = self._server_settings_selection_changed()
+        has_changes = model_changed or audio_changed or parakeet_changed or server_changed
         self.update_btn.setEnabled(has_changes)
         if model_changed:
             self.update_btn.setText("Reload Model")
@@ -411,7 +511,30 @@ class SettingsDialog(QDialog):
             self._ext_checked = dlg.get_checked()
             self.file_types_changed.emit(self._ext_checked)
 
+    def _open_server_guide(self) -> None:
+        guide_path = Path(__file__).parent.parent / "guides" / "SERVER_API_GUIDE.html"
+        if not guide_path.is_file():
+            logger.warning(f"Guide not found at {guide_path}")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(guide_path.resolve())))
+
     def _on_update_clicked(self) -> None:
+        if self._server_settings_selection_changed():
+            wants_server_on = self.server_mode_toggle.isChecked()
+            currently_on = bool(self.current_server_settings.get("server_mode_enabled", False))
+            if wants_server_on and not currently_on and self._is_busy_check():
+                QMessageBox.warning(
+                    self,
+                    "Transcription in progress",
+                    "A transcription is currently being processed.\n\n"
+                    "Wait for it to finish before turning Server Mode on.",
+                )
+                self.server_mode_toggle.blockSignals(True)
+                self.server_mode_toggle.setChecked(False)
+                self.server_mode_toggle.blockSignals(False)
+                self._check_for_changes()
+                return
+
         if self._model_settings_changed():
             model = self.model_dropdown.currentText()
             precision = self.precision_dropdown.currentText()
@@ -431,5 +554,11 @@ class SettingsDialog(QDialog):
                 "segment_duration": self.segment_duration_spin.value(),
             }
             self.parakeet_settings_changed.emit(settings)
+
+        if self._server_settings_selection_changed():
+            self.server_mode_changed.emit(
+                self.server_mode_toggle.isChecked(),
+                self.server_port_spin.value(),
+            )
 
         self.accept()
