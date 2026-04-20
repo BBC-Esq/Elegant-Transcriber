@@ -68,17 +68,21 @@ def _get_remote_nemo_size(model_id: str) -> int:
 
 
 def _load_parakeet_model(local_path: str, device: str, torch_dtype) -> object:
-    logger.info("Importing NeMo ASR...")
+    # Targeted import: pulling in the full nemo.collections.asr namespace
+    # transitively loads ~19 unrelated ASR model classes (CTC, hybrid, K2,
+    # diarization, SSL, multitalker, etc.) and adds ~16s to startup.
+    # EncDecRNNTBPEModel is the concrete class for Parakeet TDT v2 and v3.
+    logger.info("Importing NeMo Parakeet model class (EncDecRNNTBPEModel)...")
     with contextlib.redirect_stdout(io.StringIO()), \
          contextlib.redirect_stderr(io.StringIO()):
-        import nemo.collections.asr as nemo_asr
+        from nemo.collections.asr.models.rnnt_bpe_models import EncDecRNNTBPEModel
 
     stderr_capture = io.StringIO()
 
     logger.info(f"Loading Parakeet from local path: {local_path}")
     with contextlib.redirect_stdout(io.StringIO()), \
          contextlib.redirect_stderr(stderr_capture):
-        model = nemo_asr.models.ASRModel.restore_from(
+        model = EncDecRNNTBPEModel.restore_from(
             restore_path=local_path, map_location="cpu"
         )
 
