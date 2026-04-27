@@ -68,12 +68,16 @@ def _resample(audio: np.ndarray, orig_sr: int, target_sr: int = SR) -> np.ndarra
 
 
 def _to_mono_float32(audio: np.ndarray) -> np.ndarray:
+    if audio.size == 0:
+        return audio.flatten().astype(np.float32)
     if audio.ndim > 1:
         if audio.shape[0] <= audio.shape[-1]:
             audio = audio.mean(axis=0)
         else:
             audio = audio.mean(axis=-1)
     audio = audio.flatten().astype(np.float32)
+    if audio.size == 0:
+        return audio
     if audio.max() > 1.0 or audio.min() < -1.0:
         max_val = max(abs(audio.max()), abs(audio.min()))
         if max_val > 0:
