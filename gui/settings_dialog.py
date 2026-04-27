@@ -283,6 +283,7 @@ class SettingsDialog(QDialog):
         self.include_timestamps_cb.toggled.connect(self._update_segment_duration_enabled)
         self.segment_duration_spin.valueChanged.connect(self._check_for_changes)
         self.server_mode_toggle.toggled.connect(self._check_for_changes)
+        self.server_mode_toggle.toggled.connect(self._apply_server_mode_lock)
         self.server_port_spin.valueChanged.connect(self._check_for_changes)
 
     def _populate_from_settings(self) -> None:
@@ -475,7 +476,7 @@ class SettingsDialog(QDialog):
         return current != self.current_server_settings
 
     def _apply_server_mode_lock(self) -> None:
-        server_on = bool(self.current_server_settings.get("server_mode_enabled", False))
+        server_on = bool(self.server_mode_toggle.isChecked())
         lock_tip = (
             "<qt>Locked while the program is in<br>"
             "Server Mode. Turn the Server Mode<br>"
@@ -489,8 +490,7 @@ class SettingsDialog(QDialog):
         ]
         for w in locked:
             w.setEnabled(not server_on)
-            if server_on:
-                w.setToolTip(lock_tip)
+            w.setToolTip(lock_tip)
 
     def _check_for_changes(self) -> None:
         model_changed = self._model_settings_changed()
