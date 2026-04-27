@@ -160,7 +160,7 @@ class ConfigManager:
 
         try:
             if self._config_path.exists():
-                with self._config_path.open() as f:
+                with self._config_path.open(encoding="utf-8") as f:
                     loaded_config = yaml.safe_load(f) or {}
             else:
                 logger.info("Config file not found, creating with defaults")
@@ -225,8 +225,8 @@ class ConfigManager:
             validated_config = copy.deepcopy(config)
             self._validate_and_sanitize(validated_config)
 
-            with self._config_path.open("w") as f:
-                yaml.safe_dump(validated_config, f, sort_keys=False)
+            with self._config_path.open("w", encoding="utf-8") as f:
+                yaml.safe_dump(validated_config, f, sort_keys=False, allow_unicode=True)
 
             self._config_cache = validated_config
             logger.debug("Configuration saved successfully")
