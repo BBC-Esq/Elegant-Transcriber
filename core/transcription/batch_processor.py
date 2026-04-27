@@ -7,6 +7,7 @@ from PySide6.QtCore import QThread, Signal, QElapsedTimer
 
 from core.audio.audio_loader import load_audio_for_parakeet, PARAKEET_SAMPLE_RATE
 from core.output.writers import SegmentData, TranscriptionResult, write_output
+from core.text.curation import curate_text
 from core.transcription.parakeet_core import (
     transcribe_canary,
     transcribe_text,
@@ -57,6 +58,7 @@ class BatchProcessor(QThread):
         segment_duration: int,
         include_timestamps: bool,
         model_type: str = "parakeet",
+        curate_enabled: bool = False,
     ):
         super().__init__()
         self.files = files
@@ -67,6 +69,7 @@ class BatchProcessor(QThread):
         self.segment_duration = int(segment_duration)
         self.include_timestamps = bool(include_timestamps)
         self.model_type = model_type or "parakeet"
+        self.curate_enabled = bool(curate_enabled)
         self.stop_requested = Event()
 
     def request_stop(self) -> None:
@@ -119,6 +122,11 @@ class BatchProcessor(QThread):
                         )
                         if self.stop_requested.is_set():
                             break
+                        if self.curate_enabled:
+                            try:
+                                text = curate_text(text)
+                            except Exception as e:
+                                logger.warning(f"Text curation failed for {audio_file.name}: {e}")
                     elif include_timestamps:
                         ts_segments = transcribe_with_timestamps(
                             self.model, audio,
@@ -141,6 +149,11 @@ class BatchProcessor(QThread):
                         )
                         if self.stop_requested.is_set():
                             break
+                        if self.curate_enabled:
+                            try:
+                                text = curate_text(text)
+                            except Exception as e:
+                                logger.warning(f"Text curation failed for {audio_file.name}: {e}")
 
                     result = TranscriptionResult(
                         text=text,

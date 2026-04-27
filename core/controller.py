@@ -184,6 +184,7 @@ class TranscriberController(QObject):
             segment_duration=segment_duration,
             include_timestamps=include_timestamps,
             model_type=model_type,
+            curate_enabled=bool(config_manager.get_value("curate_transcription", True)),
         )
         self._batch_processor.progress.connect(self._on_batch_progress)
         self._batch_processor.finished.connect(self._on_batch_completed)
