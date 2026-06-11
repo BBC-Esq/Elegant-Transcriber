@@ -198,6 +198,14 @@ class MainWindow(QMainWindow):
         self._is_loading_model = False
         self._download_total_bytes = 0
 
+        # Output routing for the next transcription result. Each transcription
+        # entry point (file panel, drag-drop, recording) sets these to declare
+        # where its output goes; recordings/drag-drop use clipboard defaults.
+        self._pending_output_mode = "clipboard"
+        self._pending_output_format = "txt"
+        self._pending_output_dir = ""
+        self._pending_source_file = ""
+
         self.clipboard_window = ClipboardSideWindow(None, width=_DEFAULT_CLIPBOARD_WIDTH)
         self.clipboard_window.user_closed.connect(self._on_clipboard_closed)
         self.clipboard_window.docked_changed.connect(
@@ -904,6 +912,13 @@ class MainWindow(QMainWindow):
             update_button_property(self.record_button, "recording", False)
         else:
             if self.controller.start_recording():
+                # A recording's transcription goes to the clipboard only.
+                # Reset pending output state so it can't inherit a stale
+                # file-output target from a previous file-panel transcription.
+                self._pending_output_mode = "clipboard"
+                self._pending_output_format = "txt"
+                self._pending_output_dir = ""
+                self._pending_source_file = ""
                 self.is_recording = True
                 self.record_button.setText("Recording...")
                 self.record_button.set_state(WaveformButton.RECORDING)
