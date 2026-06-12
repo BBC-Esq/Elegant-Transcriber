@@ -1042,6 +1042,10 @@ class MainWindow(QMainWindow):
         self.record_button.setEnabled(True)
 
     def _transcribe_specific_file(self, file_path: str) -> None:
+        # Defense in depth: local transcription is disabled in server mode.
+        if self._server_mode_enabled:
+            return
+
         if not file_path or not self._is_supported_audio_file(file_path):
             QMessageBox.warning(self, "Unsupported File", "Please select a supported audio file.")
             return
@@ -1163,12 +1167,17 @@ class MainWindow(QMainWindow):
             return super().eventFilter(obj, event)
 
         et = event.type()
+        # Drag-drop transcription runs locally on the controller's
+        # transcription_service, which shares the model_manager with the
+        # server. Block it in server mode (consistent with the disabled
+        # record button and file panel) so dropped files don't start a local
+        # transcription that races server requests.
         if et in (QEvent.DragEnter, QEvent.DragMove):
-            if self._extract_first_supported_drop(event):
+            if not self._server_mode_enabled and self._extract_first_supported_drop(event):
                 event.acceptProposedAction()
                 return True
         elif et == QEvent.Drop:
-            if p := self._extract_first_supported_drop(event):
+            if not self._server_mode_enabled and (p := self._extract_first_supported_drop(event)):
                 event.acceptProposedAction()
                 self._transcribe_specific_file(p)
                 return True
@@ -1194,9 +1203,6 @@ class MainWindow(QMainWindow):
         self._sync_side_windows()
 
     def closeEvent(self, event):
-        if self._server_manager.is_running():
-            self._server_manager.cleanup()
-
         if self.controller.is_transcribing() or self.controller.is_batch_processing():
             reply = QMessageBox.question(
                 self,
@@ -1209,6 +1215,11 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.Ok:
                 event.ignore()
                 return
+
+        # Tear the server down only once we're committed to closing, so
+        # cancelling the prompt above leaves a running server intact.
+        if self._server_manager.is_running():
+            self._server_manager.cleanup()
 
         self._sample_timer.stop()
         self.record_button.stop()
