@@ -99,6 +99,7 @@ class ServerManager(QObject):
                     f"Server did not start within {STARTUP_TIMEOUT_MS} ms "
                     f"on port {self._port}"
                 )
+                self._shutdown_thread()
                 self.server_error.emit(
                     f"Server did not start within {STARTUP_TIMEOUT_MS // 1000} "
                     f"seconds on port {self._port}."
@@ -108,6 +109,16 @@ class ServerManager(QObject):
         if self._startup_timer is not None:
             self._startup_timer.stop()
             self._startup_timer = None
+
+    def _shutdown_thread(self) -> None:
+        if self._server is not None:
+            self._server.should_exit = True
+        if self._thread is not None:
+            self._thread.join(timeout=5.0)
+            if self._thread.is_alive():
+                logger.warning("Server thread did not stop within timeout")
+            self._thread = None
+        self._server = None
 
     def _run_server(self) -> None:
         try:
@@ -129,17 +140,7 @@ class ServerManager(QObject):
         self._stop_startup_timer()
 
         was_running = self.is_running()
-
-        if self._server is not None:
-            self._server.should_exit = True
-
-        if self._thread is not None:
-            self._thread.join(timeout=5.0)
-            if self._thread.is_alive():
-                logger.warning("Server thread did not stop within timeout")
-            self._thread = None
-
-        self._server = None
+        self._shutdown_thread()
 
         if was_running:
             logger.info("Server stopped")
