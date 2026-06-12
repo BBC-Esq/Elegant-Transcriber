@@ -82,14 +82,19 @@ def _to_mono_float32(audio: np.ndarray) -> np.ndarray:
             audio = audio.mean(axis=0)
         else:
             audio = audio.mean(axis=-1)
+    orig_dtype = audio.dtype
     audio = audio.flatten().astype(np.float32)
     if audio.size == 0:
         return audio
+
+    if np.issubdtype(orig_dtype, np.integer):
+        info = np.iinfo(orig_dtype)
+        return audio / float(max(abs(int(info.min)), int(info.max) + 1))
+
     if audio.max() > 1.0 or audio.min() < -1.0:
-        max_val = max(abs(audio.max()), abs(audio.min()))
-        if max_val > 0:
-            if np.issubdtype(audio.dtype, np.integer) or max_val > 10:
-                audio = audio / 32768.0
+        max_val = max(abs(float(audio.max())), abs(float(audio.min())))
+        if max_val > 10:
+            audio = audio / 32768.0
     return audio
 
 
