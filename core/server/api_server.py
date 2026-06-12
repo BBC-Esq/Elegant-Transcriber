@@ -103,6 +103,8 @@ def _load_audio_from_file(path: str) -> np.ndarray:
             resampled = resampler.resample(frame)
             for r in resampled:
                 frames.append(r.to_ndarray())
+        for r in resampler.resample(None):
+            frames.append(r.to_ndarray())
     finally:
         container.close()
     if not frames:

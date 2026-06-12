@@ -17,6 +17,8 @@ def load_audio_for_parakeet(audio_path: str | Path, target_sr: int = PARAKEET_SA
             resampled = resampler.resample(frame)
             for r in resampled:
                 frames.append(r.to_ndarray())
+        for r in resampler.resample(None):
+            frames.append(r.to_ndarray())
     finally:
         container.close()
     if not frames:
