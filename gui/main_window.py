@@ -745,6 +745,11 @@ class MainWindow(QMainWindow):
         self._server_port = port
         config_manager.set_value("server_port", port)
 
+        # Set the controller's server-mode flag before the server can accept
+        # requests, so API-driven model loads/errors don't drive the local GUI
+        # or rewrite the user's saved model settings.
+        self.controller.set_server_mode(enabled)
+
         if enabled and not self._server_manager.is_running():
             defaults = ServerTranscriptionSettings(
                 model_key=(
@@ -797,6 +802,7 @@ class MainWindow(QMainWindow):
         logger.error(f"Server error: {message}")
         QMessageBox.critical(self, "Server Error", f"Failed to start server:\n\n{message}")
         self._server_mode_enabled = False
+        self.controller.set_server_mode(False)
         config_manager.set_value("server_mode_enabled", False)
         self._apply_server_mode_ui(False)
 
@@ -1120,6 +1126,12 @@ class MainWindow(QMainWindow):
         for widget in self._toggleable_widgets:
             if hasattr(widget, "setEnabled"):
                 widget.setEnabled(enabled)
+
+        # Server mode deliberately disables the recorder. set_widgets_enabled
+        # has many callers, so re-assert the lock here as a safety net: the
+        # record button must never become clickable while server mode is on.
+        if enabled and self._server_mode_enabled:
+            self.record_button.setEnabled(False)
 
         if enabled:
             self.cancel_button.setVisible(False)
