@@ -32,15 +32,18 @@ def _is_oom_error(exc: Exception) -> bool:
     return False
 
 
-def _deduplicated_output_path(output_dir: Path, stem: str, suffix: str,
-                               seen: dict[str, int]) -> Path:
-    key = stem.lower()
-    if key in seen:
-        seen[key] += 1
-        return output_dir / f"{stem}_{seen[key]}{suffix}"
-    else:
-        seen[key] = 0
-        return output_dir / f"{stem}{suffix}"
+def _deduplicated_output_path(target: Path, seen: set[str]) -> Path:
+    # Key on the full output path, not just the stem, so two inputs that share
+    # a stem in the same directory (e.g. interview.mp3 + interview.wav, or a
+    # case-only difference on Windows) don't clobber each other, while inputs
+    # with the same stem in different directories are left untouched.
+    candidate = target
+    n = 0
+    while str(candidate).lower() in seen:
+        n += 1
+        candidate = target.with_name(f"{target.stem}_{n}{target.suffix}")
+    seen.add(str(candidate).lower())
+    return candidate
 
 
 class BatchProcessor(QThread):
@@ -82,7 +85,7 @@ class BatchProcessor(QThread):
         timer = QElapsedTimer()
         timer.start()
 
-        seen_names: dict[str, int] = {}
+        seen_paths: set[str] = set()
 
         include_timestamps = self.include_timestamps
         if self.model_type == "canary":
@@ -167,11 +170,10 @@ class BatchProcessor(QThread):
                     if self.output_directory:
                         out_dir = Path(self.output_directory)
                         out_dir.mkdir(parents=True, exist_ok=True)
-                        output_file = _deduplicated_output_path(
-                            out_dir, audio_file.stem, out_suffix, seen_names
-                        )
+                        target = out_dir / f"{audio_file.stem}{out_suffix}"
                     else:
-                        output_file = audio_file.with_suffix(out_suffix)
+                        target = audio_file.with_suffix(out_suffix)
+                    output_file = _deduplicated_output_path(target, seen_paths)
 
                     write_output(result, output_file, self.output_format)
 
