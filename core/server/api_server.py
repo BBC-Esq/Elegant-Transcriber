@@ -30,6 +30,13 @@ SR = 16000
 CHUNK_OVERLAP_SECONDS = 7
 CANARY_MAX_CHUNK_LENGTH = 40
 
+# Valid segment_length range, matching the GUI/config validator. Client-supplied
+# values arrive over HTTP without the config-layer clamp, so the server must
+# enforce these bounds itself. A segment_length <= CHUNK_OVERLAP_SECONDS makes
+# the chunking step zero or negative, which loops forever and hangs the worker.
+MIN_SEGMENT_LENGTH = 10
+MAX_SEGMENT_LENGTH = 100
+
 
 class AppState:
     model_manager: Any = None
@@ -202,6 +209,10 @@ class ServerTranscriptionWorker:
         seg_len = self.settings.segment_length
         if self.model_type == "canary":
             seg_len = min(seg_len, CANARY_MAX_CHUNK_LENGTH)
+        # Defensive floor: guarantee the chunk step (segment_samples -
+        # overlap_samples) stays positive so the loop below can never spin
+        # forever, even if settings were built without _build_settings' clamp.
+        seg_len = max(seg_len, CHUNK_OVERLAP_SECONDS + 1)
         segment_samples = seg_len * SR
         overlap_samples = CHUNK_OVERLAP_SECONDS * SR
         audio_length = len(audio)
@@ -458,10 +469,13 @@ def _build_settings(
 
     model_key, model_info = _resolve_model_key(model_name, precision, device, defaults)
 
+    seg_len = segment_length or defaults.segment_length
+    seg_len = max(MIN_SEGMENT_LENGTH, min(int(seg_len), MAX_SEGMENT_LENGTH))
+
     settings = TranscriptionSettings(
         model_key=model_key,
         device=device or defaults.device,
-        segment_length=segment_length or defaults.segment_length,
+        segment_length=seg_len,
         segment_duration=segment_duration or defaults.segment_duration,
         output_format=output_format or defaults.output_format,
         word_timestamps=word_timestamps if word_timestamps is not None else defaults.word_timestamps,
