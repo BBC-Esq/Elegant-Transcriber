@@ -258,6 +258,14 @@ class TranscriptionService(QObject):
         self.transcription_completed.emit(text)
 
     def _on_transcription_done_with_result(self, result: object) -> None:
+        # Curate the saved-file text to match the clipboard path and the batch
+        # processor. Curation applies to plain text only; timestamped output
+        # (segments present, used by srt/vtt/txt-with-segments) is left raw.
+        if self.curate_enabled and not result.segments:
+            try:
+                result.text = curate_text(result.text)
+            except Exception as e:
+                logger.warning(f"Text curation failed: {e}")
         self.transcription_completed_with_result.emit(result)
 
     def _on_progress_updated(self, segment_num: int, total_segments: int, percent: float) -> None:
