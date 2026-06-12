@@ -11,11 +11,9 @@ _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def get_log_directory() -> Path:
-    if getattr(sys, 'frozen', False):
-        log_dir = Path(sys.executable).parent / "logs"
-    else:
-        log_dir = Path.cwd() / "logs"
+    from utils import get_resource_path
 
+    log_dir = Path(get_resource_path("logs"))
     log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir
 
