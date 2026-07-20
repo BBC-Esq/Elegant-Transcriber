@@ -690,6 +690,7 @@ class MainWindow(QMainWindow):
         self._is_loading_model = False
         self.download_progress_bar.setVisible(False)
         self.cancel_download_button.setVisible(False)
+        self.cancel_download_button.setEnabled(True)
         self._show_current_model_status()
 
     @Slot(str)

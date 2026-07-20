@@ -21,6 +21,7 @@ if sys.stderr is None:
     sys.stderr = _NullWriter()
 
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+os.environ["HF_HUB_DISABLE_XET"] = "1"
 
 warnings.filterwarnings("ignore", category=UserWarning, message=r".*pkg_resources is deprecated.*")
 warnings.filterwarnings("ignore", message=r".*Megatron.*")

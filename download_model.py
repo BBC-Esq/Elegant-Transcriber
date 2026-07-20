@@ -1,5 +1,9 @@
+import os
 import sys
 from pathlib import Path
+
+os.environ["HF_HUB_DISABLE_XET"] = "1"
+
 from huggingface_hub import hf_hub_download, snapshot_download
 
 
