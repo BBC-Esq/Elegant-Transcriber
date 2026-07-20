@@ -46,6 +46,8 @@ build/
 dist/
 *.egg-info/
 *.spec
-installer/
+installer/*
+!installer/requirements-cpu.txt
+!installer/requirements-gpu.txt
 installer-output/
 tools/
