@@ -11,6 +11,7 @@ from core.models.metadata import ModelMetadata
 from core.audio.manager import AudioManager
 from core.audio.device_utils import get_optimal_audio_settings
 from core.transcription.service import TranscriptionService
+from core.temp_file_manager import temp_file_manager
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -270,6 +271,8 @@ class TranscriberController(QObject):
                 model, model_version, audio_file, is_temp_file=True,
             )
         else:
+            temp_file_manager.release(Path(audio_file))
+            self.update_button_signal.emit("Click to Record")
             self.enable_widgets_signal.emit(True)
             self.error_occurred.emit(
                 "Audio Error", "No model is loaded to process audio"
@@ -279,6 +282,7 @@ class TranscriberController(QObject):
     def _on_audio_error(self, error: str) -> None:
         self._awaiting_recording_audio = False
         logger.error(f"Audio error: {error}")
+        self.update_button_signal.emit("Click to Record")
         self.enable_widgets_signal.emit(True)
         self.error_occurred.emit("Audio Error", error)
 

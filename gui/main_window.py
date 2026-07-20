@@ -891,6 +891,11 @@ class MainWindow(QMainWindow):
     def _show_error_dialog(self, title: str, message: str) -> None:
         logger.error(f"Error: {title} - {message}")
         self._is_loading_model = False
+        if "audio" in title.lower() and self.is_recording:
+            self._sample_timer.stop()
+            self.is_recording = False
+            update_button_property(self.record_button, "recording", False)
+            self.record_button.set_state(WaveformButton.IDLE)
         self.download_progress_bar.setVisible(False)
         self.cancel_download_button.setVisible(False)
         self.cancel_download_button.setEnabled(True)

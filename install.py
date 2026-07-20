@@ -201,44 +201,37 @@ def upgrade_pip_setuptools_wheel(max_retries=5, delay=3):
                     time.sleep(delay)
 
 
-def install_libraries(libraries, max_retries=5, delay=3):
-    command = ["uv", "pip", "install"] + libraries
-
+def _run_install_command(command, label, max_retries, delay):
     for attempt in range(max_retries):
         try:
-            print(f"\nAttempt {attempt + 1} of {max_retries}: Installing {len(libraries)} libraries...")
+            print(f"\nAttempt {attempt + 1} of {max_retries}: {label}...")
             subprocess.run(command, check=True, text=True, timeout=1800)
-            print(f"\033[92mSuccessfully installed all {len(libraries)} libraries\033[0m")
+            print(f"\033[92mSuccessfully completed: {label}\033[0m")
             return True, attempt + 1
-        except subprocess.CalledProcessError as e:
-            print(f"Attempt {attempt + 1} failed.")
-            if e.stderr:
-                print(f"Error: {e.stderr.strip()}")
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as e:
+            print(f"Attempt {attempt + 1} failed: {type(e).__name__}")
+            stderr = getattr(e, "stderr", None)
+            if stderr:
+                print(f"Error: {stderr.strip()}")
             if attempt < max_retries - 1:
                 print(f"Retrying in {delay} seconds...")
                 time.sleep(delay)
 
     return False, max_retries
+
+
+def install_libraries(libraries, max_retries=5, delay=3):
+    command = [sys.executable, "-m", "uv", "pip", "install"] + libraries
+    return _run_install_command(
+        command, f"Installing {len(libraries)} libraries", max_retries, delay
+    )
 
 
 def install_no_deps_libraries(libraries, max_retries=5, delay=3):
-    command = ["uv", "pip", "install", "--no-deps"] + libraries
-
-    for attempt in range(max_retries):
-        try:
-            print(f"\nAttempt {attempt + 1} of {max_retries}: Installing {len(libraries)} libraries (--no-deps)...")
-            subprocess.run(command, check=True, text=True, timeout=1800)
-            print(f"\033[92mSuccessfully installed all {len(libraries)} --no-deps libraries\033[0m")
-            return True, attempt + 1
-        except subprocess.CalledProcessError as e:
-            print(f"Attempt {attempt + 1} failed.")
-            if e.stderr:
-                print(f"Error: {e.stderr.strip()}")
-            if attempt < max_retries - 1:
-                print(f"Retrying in {delay} seconds...")
-                time.sleep(delay)
-
-    return False, max_retries
+    command = [sys.executable, "-m", "uv", "pip", "install", "--no-deps"] + libraries
+    return _run_install_command(
+        command, f"Installing {len(libraries)} libraries (--no-deps)", max_retries, delay
+    )
 
 
 def run_nemo_patches():
@@ -287,7 +280,7 @@ def main():
     print(f"\033[92mPlatform: {PLATFORM} | Python: {python_version} | Hardware: {hardware_type}\033[0m")
 
     print("\033[92mInstalling uv:\033[0m")
-    subprocess.run(["pip", "install", "uv"], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "uv"], check=True)
 
     print("\033[92mUpgrading pip, setuptools, and wheel:\033[0m")
     upgrade_pip_setuptools_wheel()

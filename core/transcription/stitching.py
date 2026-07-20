@@ -93,7 +93,7 @@ def stitch_texts(texts: List[str], had_overlap: List[bool],
         else:
             result = result + " " + texts[i]
 
-    return result
+    return result.strip()
 
 
 def _find_exact_overlap(prev_tail: List[str], curr_head: List[str], min_match: int) -> int:
