@@ -27,10 +27,10 @@ class ServerManager(QObject):
         self._startup_timer: Optional[QTimer] = None
         self._startup_elapsed_ms: int = 0
 
-    def start_server(self, port: int, model_manager, default_settings: TranscriptionSettings) -> None:
+    def start_server(self, port: int, model_manager, default_settings: TranscriptionSettings) -> bool:
         if self.is_running():
             self.server_error.emit("Server is already running")
-            return
+            return False
 
         try:
             import uvicorn
@@ -63,7 +63,7 @@ class ServerManager(QObject):
         except Exception as e:
             logger.error(f"Failed to start server: {e}", exc_info=True)
             self.server_error.emit(str(e))
-            return
+            return False
 
         # Don't report success until uvicorn has actually bound the port. On
         # bind failure (e.g. port in use) uvicorn calls sys.exit(1), raising
@@ -76,6 +76,7 @@ class ServerManager(QObject):
         self._startup_timer.setInterval(STARTUP_POLL_INTERVAL_MS)
         self._startup_timer.timeout.connect(self._check_startup)
         self._startup_timer.start()
+        return True
 
     def _check_startup(self) -> None:
         if self._server is not None and self._server.started:

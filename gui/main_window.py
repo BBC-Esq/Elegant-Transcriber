@@ -767,11 +767,12 @@ class MainWindow(QMainWindow):
         config_manager.set_value("server_port", port)
 
         if enabled and not self._server_manager.is_running():
-            self._server_manager.start_server(
+            if not self._server_manager.start_server(
                 port,
                 self.controller.model_manager,
                 self._build_server_default_settings(),
-            )
+            ):
+                return
         elif not enabled and self._server_manager.is_running():
             self._server_manager.stop_server()
 
