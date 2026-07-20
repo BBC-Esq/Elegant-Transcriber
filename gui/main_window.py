@@ -731,6 +731,7 @@ class MainWindow(QMainWindow):
             is_busy_check=(lambda: self.controller.is_transcribing()
                            or self.controller.is_batch_processing()
                            or self._is_loading_model),
+            server_busy_check=(lambda: self._server_manager.is_transcription_active()),
         )
         dlg.model_update_requested.connect(self._on_settings_update_requested)
         dlg.audio_device_changed.connect(self._on_audio_device_changed)

@@ -140,6 +140,9 @@ class ServerManager(QObject):
         self._stop_startup_timer()
 
         was_running = self.is_running()
+        if was_running:
+            from core.server.api_server import _state
+            _state.cancel_event.set()
         self._shutdown_thread()
 
         if was_running:
@@ -161,8 +164,6 @@ class ServerManager(QObject):
 
     def cleanup(self) -> None:
         if self.is_running():
-            from core.server.api_server import _state
-            _state.cancel_event.set()
             self.stop_server()
 
     @property

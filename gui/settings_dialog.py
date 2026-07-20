@@ -81,6 +81,7 @@ class SettingsDialog(QDialog):
         current_ext_checked: dict[str, bool] | None = None,
         current_server_settings: dict | None = None,
         is_busy_check=None,
+        server_busy_check=None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Settings")
@@ -101,6 +102,7 @@ class SettingsDialog(QDialog):
             "server_port": 8765,
         }
         self._is_busy_check = is_busy_check or (lambda: False)
+        self._server_busy_check = server_busy_check or (lambda: False)
         self._last_model_type = ModelMetadata.get_model_type(
             self.current_settings.get("model_name", "Parakeet TDT 0.6B v2")
         )
@@ -505,10 +507,11 @@ class SettingsDialog(QDialog):
             self.update_btn.setText("Update Settings")
         update_button_property(self.update_btn, "changed", has_changes)
 
-    def _revert_server_toggle(self) -> None:
+    def _revert_server_toggle(self, checked: bool = False) -> None:
         self.server_mode_toggle.blockSignals(True)
-        self.server_mode_toggle.setChecked(False)
+        self.server_mode_toggle.setChecked(checked)
         self.server_mode_toggle.blockSignals(False)
+        self._apply_server_mode_lock()
         self._check_for_changes()
 
     def _open_file_types_dialog(self) -> None:
@@ -548,6 +551,17 @@ class SettingsDialog(QDialog):
                     )
                     self._revert_server_toggle()
                     return
+
+            if not wants_server_on and currently_on and self._server_busy_check():
+                QMessageBox.warning(
+                    self,
+                    "Server busy",
+                    "The server is currently processing a transcription "
+                    "request.\n\nWait for it to finish before turning "
+                    "Server Mode off.",
+                )
+                self._revert_server_toggle(checked=True)
+                return
 
         if self._model_settings_changed():
             model = self.model_dropdown.currentText()

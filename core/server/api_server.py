@@ -53,7 +53,7 @@ _state = AppState()
 def set_app_state(*, model_manager, default_settings: TranscriptionSettings) -> None:
     _state.model_manager = model_manager
     _state.default_settings = default_settings
-    _state.cancel_event.clear()
+    _state.cancel_event = Event()
     _state.transcription_active = False
 
 
@@ -396,13 +396,13 @@ class ServerTranscriptionWorker:
         return grouped
 
 
-async def _queue_worker():
+async def _queue_worker(queue: asyncio.Queue, cancel_event: Event):
     while True:
-        item: WorkItem = await _state.queue.get()
+        item: WorkItem = await queue.get()
         _state.transcription_active = True
         try:
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, _do_transcription, item)
+            result = await loop.run_in_executor(None, _do_transcription, item, cancel_event)
             if not item.future.done():
                 item.future.set_result(result)
         except Exception as e:
@@ -411,10 +411,10 @@ async def _queue_worker():
                 item.future.set_exception(e)
         finally:
             _state.transcription_active = False
-            _state.queue.task_done()
+            queue.task_done()
 
 
-def _do_transcription(item: WorkItem) -> Dict[str, Any]:
+def _do_transcription(item: WorkItem, cancel_event: Event) -> Dict[str, Any]:
     start_time = time.perf_counter()
 
     model_key = item.settings.model_key
@@ -427,9 +427,12 @@ def _do_transcription(item: WorkItem) -> Dict[str, Any]:
         raise RuntimeError("Failed to load model")
 
     worker = ServerTranscriptionWorker(
-        item.settings, model_info, _state.cancel_event,
+        item.settings, model_info, cancel_event,
     )
     result = worker.transcribe(model, item.audio)
+
+    if cancel_event.is_set():
+        raise RuntimeError("Server shutting down")
 
     elapsed = time.perf_counter() - start_time
     result["processing_time_seconds"] = round(elapsed, 3)
@@ -510,27 +513,27 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        _state.queue = asyncio.Queue()
-        _state.cancel_event.clear()
-        _state.worker_task = asyncio.create_task(_queue_worker())
+        queue = asyncio.Queue()
+        cancel_event = _state.cancel_event
+        _state.queue = queue
+        worker_task = asyncio.create_task(_queue_worker(queue, cancel_event))
+        _state.worker_task = worker_task
         logger.info("Transcription queue worker started")
         yield
-        if _state.worker_task:
-            _state.worker_task.cancel()
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
+        while not queue.empty():
             try:
-                await _state.worker_task
-            except asyncio.CancelledError:
-                pass
-        if _state.queue:
-            while not _state.queue.empty():
-                try:
-                    item = _state.queue.get_nowait()
-                    if not item.future.done():
-                        item.future.set_exception(
-                            RuntimeError("Server shutting down")
-                        )
-                except asyncio.QueueEmpty:
-                    break
+                item = queue.get_nowait()
+                if not item.future.done():
+                    item.future.set_exception(
+                        RuntimeError("Server shutting down")
+                    )
+            except asyncio.QueueEmpty:
+                break
         logger.info("Transcription server shut down")
 
     app = FastAPI(
