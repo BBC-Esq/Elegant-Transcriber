@@ -59,13 +59,9 @@ class TranscriberController(QObject):
         self._load_parakeet_params()
 
         self._batch_processor = None
-        self._server_mode_active = False
 
         self._connect_signals()
         logger.info("TranscriberController initialized")
-
-    def set_server_mode(self, active: bool) -> None:
-        self._server_mode_active = bool(active)
 
     def _get_current_model_version(self) -> str | None:
         _, version = self.model_manager.get_model()
@@ -93,6 +89,7 @@ class TranscriberController(QObject):
 
     def _connect_signals(self) -> None:
         self.model_manager.model_loaded.connect(self._on_model_loaded)
+        self.model_manager.server_model_loaded.connect(self._on_server_model_loaded)
         self.model_manager.model_error.connect(self._on_model_error)
         self.model_manager.download_started.connect(self._on_download_started)
         self.model_manager.download_progress.connect(self._on_download_progress)
@@ -240,12 +237,6 @@ class TranscriberController(QObject):
     def _on_model_loaded(self, name: str, precision: str, device: str) -> None:
         self.transcription_service.set_model_type(ModelMetadata.get_model_type(name))
 
-        # In server mode this fires for model loads/swaps driven by remote API
-        # requests. Don't persist the remote request's model as the user's saved
-        # default, and don't drive GUI state (handled in the GUI layer too).
-        if self._server_mode_active:
-            return
-
         try:
             config_manager.set_model_settings(name, precision, device)
         except Exception as e:
@@ -254,15 +245,13 @@ class TranscriberController(QObject):
         self.enable_widgets_signal.emit(True)
         self.model_loaded_signal.emit(name, precision, device)
 
+    @Slot(str, str, str)
+    def _on_server_model_loaded(self, name: str, precision: str, device: str) -> None:
+        self.transcription_service.set_model_type(ModelMetadata.get_model_type(name))
+
     @Slot(str)
     def _on_model_error(self, error: str) -> None:
         logger.error(f"Model error: {error}")
-
-        # A failed model load from a remote API request must not drive the
-        # local GUI; the HTTP client receives its own error response.
-        if self._server_mode_active:
-            return
-
         self.enable_widgets_signal.emit(True)
         self.error_occurred.emit("Model Error", error)
 

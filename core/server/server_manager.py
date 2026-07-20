@@ -149,6 +149,12 @@ class ServerManager(QObject):
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
+    def update_default_settings(self, default_settings: TranscriptionSettings) -> None:
+        if not self.is_running():
+            return
+        from core.server.api_server import _state
+        _state.default_settings = default_settings
+
     def is_transcription_active(self) -> bool:
         from core.server.api_server import _state
         return _state.transcription_active

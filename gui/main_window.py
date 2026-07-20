@@ -728,7 +728,9 @@ class MainWindow(QMainWindow):
             current_parakeet_settings=parakeet_settings,
             current_ext_checked=self.file_panel.get_ext_checked(),
             current_server_settings=server_settings,
-            is_busy_check=(lambda: self.controller.is_transcribing() or self.controller.is_batch_processing()),
+            is_busy_check=(lambda: self.controller.is_transcribing()
+                           or self.controller.is_batch_processing()
+                           or self._is_loading_model),
         )
         dlg.model_update_requested.connect(self._on_settings_update_requested)
         dlg.audio_device_changed.connect(self._on_audio_device_changed)
@@ -741,32 +743,33 @@ class MainWindow(QMainWindow):
     def _on_settings_update_requested(self, model: str, precision: str, device: str) -> None:
         self.controller.update_model(model, precision, device)
 
+    def _build_server_default_settings(self) -> ServerTranscriptionSettings:
+        return ServerTranscriptionSettings(
+            model_key=(
+                ModelMetadata.resolve_model_key(
+                    self.loaded_model_settings.get("model_name", "Parakeet TDT 0.6B v2"),
+                    self.loaded_model_settings.get("precision", "bfloat16"),
+                )
+                or "Parakeet TDT 0.6B v2 - bfloat16"
+            ),
+            device=self.loaded_model_settings.get("device_type", "cuda"),
+            segment_length=int(config_manager.get_value("segment_length", 90)),
+            segment_duration=int(config_manager.get_value("segment_duration", 10)),
+            output_format=config_manager.get_value("output_format", "txt"),
+            word_timestamps=bool(config_manager.get_value("include_timestamps", False)),
+        )
+
     @Slot(bool, int)
     def _on_server_mode_changed(self, enabled: bool, port: int) -> None:
         self._server_port = port
         config_manager.set_value("server_port", port)
 
-        # Set the controller's server-mode flag before the server can accept
-        # requests, so API-driven model loads/errors don't drive the local GUI
-        # or rewrite the user's saved model settings.
-        self.controller.set_server_mode(enabled)
-
         if enabled and not self._server_manager.is_running():
-            defaults = ServerTranscriptionSettings(
-                model_key=(
-                    ModelMetadata.resolve_model_key(
-                        self.loaded_model_settings.get("model_name", "Parakeet TDT 0.6B v2"),
-                        self.loaded_model_settings.get("precision", "bfloat16"),
-                    )
-                    or "Parakeet TDT 0.6B v2 - bfloat16"
-                ),
-                device=self.loaded_model_settings.get("device_type", "cuda"),
-                segment_length=int(config_manager.get_value("segment_length", 90)),
-                segment_duration=int(config_manager.get_value("segment_duration", 10)),
-                output_format=config_manager.get_value("output_format", "txt"),
-                word_timestamps=bool(config_manager.get_value("include_timestamps", False)),
+            self._server_manager.start_server(
+                port,
+                self.controller.model_manager,
+                self._build_server_default_settings(),
             )
-            self._server_manager.start_server(port, self.controller.model_manager, defaults)
         elif not enabled and self._server_manager.is_running():
             self._server_manager.stop_server()
 
@@ -803,7 +806,6 @@ class MainWindow(QMainWindow):
         logger.error(f"Server error: {message}")
         QMessageBox.critical(self, "Server Error", f"Failed to start server:\n\n{message}")
         self._server_mode_enabled = False
-        self.controller.set_server_mode(False)
         config_manager.set_value("server_mode_enabled", False)
         self._apply_server_mode_ui(False)
 
@@ -902,6 +904,10 @@ class MainWindow(QMainWindow):
         self.file_panel.set_timestamps_supported(
             ModelMetadata.supports_timestamps(model_name)
         )
+        if self._server_manager.is_running():
+            self._server_manager.update_default_settings(
+                self._build_server_default_settings()
+            )
 
     @Slot()
     def _toggle_recording(self) -> None:

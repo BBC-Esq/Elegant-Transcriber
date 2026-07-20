@@ -505,6 +505,12 @@ class SettingsDialog(QDialog):
             self.update_btn.setText("Update Settings")
         update_button_property(self.update_btn, "changed", has_changes)
 
+    def _revert_server_toggle(self) -> None:
+        self.server_mode_toggle.blockSignals(True)
+        self.server_mode_toggle.setChecked(False)
+        self.server_mode_toggle.blockSignals(False)
+        self._check_for_changes()
+
     def _open_file_types_dialog(self) -> None:
         dlg = FileTypesDialog(self, self._ext_checked)
         if dlg.exec() == QDialog.Accepted:
@@ -522,18 +528,26 @@ class SettingsDialog(QDialog):
         if self._server_settings_selection_changed():
             wants_server_on = self.server_mode_toggle.isChecked()
             currently_on = bool(self.current_server_settings.get("server_mode_enabled", False))
-            if wants_server_on and not currently_on and self._is_busy_check():
-                QMessageBox.warning(
-                    self,
-                    "Transcription in progress",
-                    "A transcription is currently being processed.\n\n"
-                    "Wait for it to finish before turning Server Mode on.",
-                )
-                self.server_mode_toggle.blockSignals(True)
-                self.server_mode_toggle.setChecked(False)
-                self.server_mode_toggle.blockSignals(False)
-                self._check_for_changes()
-                return
+            if wants_server_on and not currently_on:
+                if self._is_busy_check():
+                    QMessageBox.warning(
+                        self,
+                        "Operation in progress",
+                        "A transcription or model load is currently in progress.\n\n"
+                        "Wait for it to finish before turning Server Mode on.",
+                    )
+                    self._revert_server_toggle()
+                    return
+                if self._model_settings_changed():
+                    QMessageBox.warning(
+                        self,
+                        "Model change pending",
+                        "The model settings were also changed.\n\n"
+                        "Apply the model change first, then turn Server Mode "
+                        "on in a second step.",
+                    )
+                    self._revert_server_toggle()
+                    return
 
         if self._model_settings_changed():
             model = self.model_dropdown.currentText()

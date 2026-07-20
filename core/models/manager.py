@@ -372,6 +372,7 @@ def _unload_model(model) -> None:
 
 class ModelManager(QObject):
     model_loaded = Signal(str, str, str)
+    server_model_loaded = Signal(str, str, str)
     model_error = Signal(str)
     download_started = Signal(str, object)
     download_progress = Signal(object, object)
@@ -470,12 +471,11 @@ class ModelManager(QObject):
                     "_config_key": config_key,
                 }
 
-            self.model_loaded.emit(model_name, precision, device)
+            self.server_model_loaded.emit(model_name, precision, device)
             return new_model
 
         except Exception as e:
             logger.error(f"get_or_load_model failed: {e}", exc_info=True)
-            self.model_error.emit(str(e))
             return None
 
     def _on_download_started(self, model_name: str, total_bytes: int, version: str) -> None:
