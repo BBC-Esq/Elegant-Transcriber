@@ -415,6 +415,9 @@ async def _queue_worker(queue: asyncio.Queue, cancel_event: Event):
 
 
 def _do_transcription(item: WorkItem, cancel_event: Event) -> Dict[str, Any]:
+    if cancel_event.is_set():
+        raise RuntimeError("Server shutting down")
+
     start_time = time.perf_counter()
 
     model_key = item.settings.model_key
@@ -422,6 +425,7 @@ def _do_transcription(item: WorkItem, cancel_event: Event) -> Dict[str, Any]:
 
     model = _state.model_manager.get_or_load_model(
         model_key, item.settings.device, model_info["precision"],
+        cancel_event=cancel_event,
     )
     if model is None:
         raise RuntimeError("Failed to load model")

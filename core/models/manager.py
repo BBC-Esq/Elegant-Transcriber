@@ -433,7 +433,15 @@ class ModelManager(QObject):
         with QMutexLocker(self._model_mutex):
             return self._model, self._model_version
 
-    def get_or_load_model(self, model_key: str, device: str, precision: str) -> Optional[object]:
+    def get_current_settings(self) -> dict:
+        with QMutexLocker(self._model_mutex):
+            return {k: v for k, v in self._current_settings.items() if k != "_config_key"}
+
+    def get_or_load_model(self, model_key: str, device: str, precision: str,
+                          cancel_event: Optional[threading.Event] = None) -> Optional[object]:
+        if cancel_event is not None and cancel_event.is_set():
+            return None
+
         model_name = model_key.split(" - ")[0] if " - " in model_key else model_key
         model_type = ModelMetadata.get_model_type(model_name)
         model_id = ModelMetadata.get_model_id(model_name)
@@ -458,6 +466,10 @@ class ModelManager(QObject):
                 new_model = _load_canary_model(local_path, device, torch_dtype)
             else:
                 new_model = _load_parakeet_model(local_path, device, torch_dtype)
+
+            if cancel_event is not None and cancel_event.is_set():
+                _unload_model(new_model)
+                return None
 
             with QMutexLocker(self._model_mutex):
                 if self._model is not None and self._current_settings.get("_config_key") != config_key:
@@ -509,13 +521,13 @@ class ModelManager(QObject):
                 _unload_model(self._model)
             self._model = model
             self._model_version = version
+            self._current_settings = {
+                "model_name": name,
+                "precision": precision,
+                "device_type": device,
+                "_config_key": (name, device, precision),
+            }
 
-        self._current_settings = {
-            "model_name": name,
-            "precision": precision,
-            "device_type": device,
-            "_config_key": (name, device, precision),
-        }
         logger.info(f"Model loaded successfully: {name}")
         self.model_loaded.emit(name, precision, device)
 

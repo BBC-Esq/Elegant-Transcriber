@@ -742,6 +742,7 @@ class MainWindow(QMainWindow):
 
     @Slot(str, str, str)
     def _on_settings_update_requested(self, model: str, precision: str, device: str) -> None:
+        self._is_loading_model = True
         self.controller.update_model(model, precision, device)
 
     def _build_server_default_settings(self) -> ServerTranscriptionSettings:
@@ -777,6 +778,28 @@ class MainWindow(QMainWindow):
         self._server_mode_enabled = enabled
         config_manager.set_value("server_mode_enabled", enabled)
         self._apply_server_mode_ui(enabled)
+
+        if not enabled:
+            self._resync_model_after_server()
+
+    def _resync_model_after_server(self) -> None:
+        if self._is_loading_model:
+            return
+        model, _ = self.controller.model_manager.get_model()
+        if model is None:
+            return
+        actual = self.controller.model_manager.get_current_settings()
+        saved = config_manager.get_model_settings()
+        keys = ("model_name", "precision", "device_type")
+        if all(actual.get(k) == saved.get(k) for k in keys):
+            return
+        logger.info(
+            f"Server mode swapped the loaded model to {actual}; "
+            f"reloading the configured model {saved}"
+        )
+        self.controller.update_model(
+            saved["model_name"], saved["precision"], saved["device_type"]
+        )
 
     def _apply_server_mode_ui(self, enabled: bool) -> None:
         self.clipboard_window.set_server_mode_enabled(enabled)
@@ -1000,6 +1023,12 @@ class MainWindow(QMainWindow):
 
         if output_format in ("srt", "vtt") and not result.segments:
             logger.warning("No segments available for timestamped output")
+            QMessageBox.warning(
+                self,
+                "No Timestamps",
+                "The transcription produced no timestamped segments, so no "
+                f"{output_format.upper()} file was written.",
+            )
             return
 
         source_path = Path(source_file) if source_file else result.source_file
