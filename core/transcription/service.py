@@ -198,6 +198,12 @@ class TranscriptionService(QObject):
 
     def transcribe_file(self, model, model_version: str, audio_file: str | Path,
                         is_temp_file: bool = True) -> None:
+        if self._is_transcribing:
+            error_msg = "A transcription is already in progress"
+            logger.error(error_msg)
+            self.transcription_error.emit(error_msg)
+            return
+
         if not model:
             error_msg = "No model available for transcription"
             logger.error(error_msg)

@@ -34,6 +34,9 @@ class AudioManager(QObject):
         self.channels = channels
         self.dtype = dtype
 
+    def is_recording(self) -> bool:
+        return self._recording_thread is not None and self._recording_thread.isRunning()
+
     def start_recording(self) -> bool:
         if self._recording_thread and self._recording_thread.isRunning():
             logger.warning("Attempted to start recording while already recording")

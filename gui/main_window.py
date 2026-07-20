@@ -966,6 +966,11 @@ class MainWindow(QMainWindow):
     def _on_file_panel_transcribe(self, file_path: str,
                                    output_mode: str, output_format: str,
                                    output_dir: str) -> None:
+        if self._busy_with_transcription():
+            self.file_panel.on_single_file_done("Not started")
+            self._warn_transcription_busy()
+            return
+
         self._pending_output_mode = output_mode
         self._pending_output_format = output_format
         self._pending_output_dir = output_dir
@@ -1017,6 +1022,11 @@ class MainWindow(QMainWindow):
 
     @Slot(list, str, str)
     def _on_batch_start(self, files, fmt, output_dir) -> None:
+        if self._busy_with_transcription():
+            self.file_panel.on_batch_completed("Not started")
+            self._warn_transcription_busy()
+            return
+
         include_timestamps = config_manager.get_value("include_timestamps", False)
         if fmt in ("srt", "vtt"):
             include_timestamps = True
@@ -1048,9 +1058,27 @@ class MainWindow(QMainWindow):
         self.record_button.set_state(WaveformButton.IDLE)
         self.record_button.setEnabled(True)
 
+    def _busy_with_transcription(self) -> bool:
+        return (self.controller.is_transcribing()
+                or self.controller.is_batch_processing()
+                or self.controller.is_awaiting_recording_audio()
+                or self.is_recording)
+
+    def _warn_transcription_busy(self) -> None:
+        QMessageBox.warning(
+            self,
+            "Operation in progress",
+            "A transcription or recording is already in progress.\n\n"
+            "Wait for it to finish before starting another one.",
+        )
+
     def _transcribe_specific_file(self, file_path: str) -> None:
         # Defense in depth: local transcription is disabled in server mode.
         if self._server_mode_enabled:
+            return
+
+        if self._busy_with_transcription():
+            self._warn_transcription_busy()
             return
 
         if not file_path or not self._is_supported_audio_file(file_path):

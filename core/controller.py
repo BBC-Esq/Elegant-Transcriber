@@ -59,6 +59,7 @@ class TranscriberController(QObject):
         self._load_parakeet_params()
 
         self._batch_processor = None
+        self._awaiting_recording_audio = False
 
         self._connect_signals()
         logger.info("TranscriberController initialized")
@@ -136,7 +137,12 @@ class TranscriberController(QObject):
         return True
 
     def stop_recording(self) -> None:
+        if self.audio_manager.is_recording():
+            self._awaiting_recording_audio = True
         self.audio_manager.stop_recording()
+
+    def is_awaiting_recording_audio(self) -> bool:
+        return self._awaiting_recording_audio
 
     def cancel_transcription(self) -> bool:
         if self.transcription_service.cancel_transcription():
@@ -257,6 +263,7 @@ class TranscriberController(QObject):
 
     @Slot(str)
     def _on_audio_ready(self, audio_file: str) -> None:
+        self._awaiting_recording_audio = False
         model, model_version = self.model_manager.get_model()
         if model and model_version:
             self.transcription_service.transcribe_file(
@@ -270,6 +277,7 @@ class TranscriberController(QObject):
 
     @Slot(str)
     def _on_audio_error(self, error: str) -> None:
+        self._awaiting_recording_audio = False
         logger.error(f"Audio error: {error}")
         self.enable_widgets_signal.emit(True)
         self.error_occurred.emit("Audio Error", error)
