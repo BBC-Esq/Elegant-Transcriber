@@ -50,6 +50,15 @@ def _install_sigint_handler() -> None:
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
+def _flush_clipboard_before_hard_exit() -> None:
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.ole32.OleFlushClipboard()
+        except Exception:
+            pass
+
+
 def _global_exception_handler(exc_type, exc_value, exc_tb):
     logger = get_logger(__name__)
     logger.critical("Unhandled exception", exc_info=(exc_type, exc_value, exc_tb))
@@ -133,7 +142,8 @@ def run_gui() -> None:
         temp_file_manager.cleanup_all()
         logger.info(f"Application exiting with code {exit_code}")
         logging.shutdown()
-        sys.exit(exit_code)
+        _flush_clipboard_before_hard_exit()
+        os._exit(exit_code)
 
     except Exception as e:
         logger.critical(f"Failed to start application: {e}", exc_info=True)
@@ -142,7 +152,10 @@ def run_gui() -> None:
             "Startup Error",
             f"Failed to start application:\n\n{e}"
         )
-        sys.exit(1)
+        temp_file_manager.cleanup_all()
+        logging.shutdown()
+        _flush_clipboard_before_hard_exit()
+        os._exit(1)
 
 
 def main() -> None:

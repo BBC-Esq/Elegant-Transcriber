@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-from PySide6.QtCore import QObject, QMutex, QMutexLocker, QThread, Signal
+from PySide6.QtCore import QObject, QMutex, QMutexLocker, QThread, Qt, Signal
 
 
 class _NullWriter:
@@ -388,6 +388,7 @@ class ModelManager(QObject):
         self._current_settings: dict = {}
         self._cancel_event: Optional[threading.Event] = None
         self._active_thread: Optional[_ModelLoaderThread] = None
+        self._loader_threads: set[_ModelLoaderThread] = set()
 
     def load_model(self, model_name: str, precision: str, device: str) -> None:
         logger.info(f"Requesting model load: {model_name}, {precision}, {device}")
@@ -412,12 +413,20 @@ class ModelManager(QObject):
         thread.download_finished.connect(self._on_download_finished)
         thread.download_cancelled.connect(self._on_download_cancelled)
         thread.loading_started.connect(self._on_loading_started)
+        self._loader_threads.add(thread)
+        thread.finished.connect(
+            self._on_loader_thread_finished, Qt.QueuedConnection
+        )
         self._active_thread = thread
         thread.start()
 
     def cancel_loading(self) -> None:
         if self._cancel_event:
             self._cancel_event.set()
+
+    def _on_loader_thread_finished(self) -> None:
+        for t in [t for t in self._loader_threads if t.isFinished()]:
+            self._loader_threads.discard(t)
 
     def get_model(self) -> tuple[Optional[object], Optional[str]]:
         with QMutexLocker(self._model_mutex):
@@ -521,6 +530,10 @@ class ModelManager(QObject):
 
         if self._active_thread and self._active_thread.isRunning():
             self._active_thread.wait(5000)
+
+        for t in list(self._loader_threads):
+            if t.isRunning():
+                t.wait(2000)
 
         with QMutexLocker(self._model_mutex):
             if self._model is not None:
