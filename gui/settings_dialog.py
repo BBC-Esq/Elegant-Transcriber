@@ -536,7 +536,8 @@ class SettingsDialog(QDialog):
                     QMessageBox.warning(
                         self,
                         "Operation in progress",
-                        "A transcription or model load is currently in progress.\n\n"
+                        "A recording, transcription, or model load is currently "
+                        "in progress.\n\n"
                         "Wait for it to finish before turning Server Mode on.",
                     )
                     self._revert_server_toggle()
