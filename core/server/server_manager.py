@@ -62,7 +62,7 @@ class ServerManager(QObject):
 
         except Exception as e:
             logger.error(f"Failed to start server: {e}", exc_info=True)
-            self.server_error.emit(str(e))
+            self.server_error.emit(f"Failed to start server: {e}")
             return False
 
         # Don't report success until uvicorn has actually bound the port. On

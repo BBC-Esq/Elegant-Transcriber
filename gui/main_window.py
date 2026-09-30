@@ -824,7 +824,7 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _on_server_error(self, message: str) -> None:
         logger.error(f"Server error: {message}")
-        QMessageBox.critical(self, "Server Error", f"Failed to start server:\n\n{message}")
+        QMessageBox.critical(self, "Server Error", message)
         self._server_mode_enabled = False
         config_manager.set_value("server_mode_enabled", False)
         self._apply_server_mode_ui(False)
@@ -997,16 +997,14 @@ class MainWindow(QMainWindow):
         self._pending_output_dir = output_dir
         self._pending_source_file = file_path
 
-        if output_format in ("srt", "vtt"):
-            self.controller.transcription_service.set_timestamps_override(True)
-        else:
-            self.controller.transcription_service.set_timestamps_override(None)
-
         logger.info(
             f"Transcribing: {file_path} (mode={output_mode}, fmt={output_format})"
         )
         self.record_button.setText("Transcribing...")
-        self.controller.transcribe_file(file_path)
+        self.controller.transcribe_file(
+            file_path,
+            include_timestamps=True if output_format in ("srt", "vtt") else None,
+        )
 
     @Slot(object)
     def _on_result_ready(self, result) -> None:

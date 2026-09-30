@@ -163,7 +163,6 @@ class TranscriptionService(QObject):
         self._segment_length: int = 90
         self._segment_duration: int = 10
         self._include_timestamps: bool = False
-        self._timestamps_override: bool | None = None
         self._model_type: str = "parakeet"
 
     def set_model_version_provider(self, func) -> None:
@@ -183,9 +182,6 @@ class TranscriptionService(QObject):
         self._model_type = model_type or "parakeet"
         logger.debug(f"Active model_type: {self._model_type}")
 
-    def set_timestamps_override(self, include_timestamps: bool | None) -> None:
-        self._timestamps_override = include_timestamps
-
     def is_transcribing(self) -> bool:
         return self._is_transcribing
 
@@ -197,7 +193,8 @@ class TranscriptionService(QObject):
         return False
 
     def transcribe_file(self, model, model_version: str, audio_file: str | Path,
-                        is_temp_file: bool = True) -> None:
+                        is_temp_file: bool = True,
+                        include_timestamps: bool | None = None) -> None:
         if self._is_transcribing:
             error_msg = "A transcription is already in progress"
             logger.error(error_msg)
@@ -216,10 +213,8 @@ class TranscriptionService(QObject):
             self._cancel_event = threading.Event()
             self._is_transcribing = True
 
-            include_timestamps = self._include_timestamps
-            if self._timestamps_override is not None:
-                include_timestamps = self._timestamps_override
-            self._timestamps_override = None
+            if include_timestamps is None:
+                include_timestamps = self._include_timestamps
 
             effective_segment_length = self._segment_length
             if self._model_type == "canary":

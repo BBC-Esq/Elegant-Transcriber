@@ -328,6 +328,13 @@ class FilePanelWindow(QWidget):
             w.setEnabled(not enabled)
             w.setToolTip(tip)
 
+        if not enabled:
+            self._recursive_cb.setEnabled(not self._is_single_mode())
+            self._start_btn.setEnabled(bool(self._selected_path) and not self._is_processing)
+            self._stop_btn.setEnabled(self._is_processing)
+            self._path_label.setToolTip(self._selected_path)
+            self._custom_dir_btn.setToolTip(self._custom_output_dir)
+
     def set_timestamps_supported(self, supported: bool) -> None:
         self._timestamps_supported = bool(supported)
         model = self._format_combo.model()
