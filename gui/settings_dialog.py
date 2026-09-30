@@ -61,6 +61,7 @@ _CANARY_CPU_DISABLED_TIP = (
     "disabled on CPU. Switch to CUDA to<br>"
     "use this model.</qt>"
 )
+_FILE_TYPES_TIP = "Configure which audio/video file types to include in batch processing"
 
 
 class SettingsDialog(QDialog):
@@ -239,7 +240,7 @@ class SettingsDialog(QDialog):
         self._file_types_btn = QPushButton("File Types...")
         self._file_types_btn.setFixedHeight(28)
         self._file_types_btn.setFixedWidth(100)
-        self._file_types_btn.setToolTip("Configure which audio/video file types to include in batch processing")
+        self._file_types_btn.setToolTip(_FILE_TYPES_TIP)
         self._file_types_btn.clicked.connect(self._open_file_types_dialog)
         file_types_row.addWidget(self._file_types_btn)
 
@@ -506,6 +507,10 @@ class SettingsDialog(QDialog):
         for w in locked:
             w.setEnabled(not server_on)
             w.setToolTip(lock_tip)
+
+        if not server_on:
+            self._file_types_btn.setToolTip(_FILE_TYPES_TIP)
+            self._update_model_dependent_widgets()
 
     def _check_for_changes(self) -> None:
         model_changed = self._model_settings_changed()
