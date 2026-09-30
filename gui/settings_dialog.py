@@ -107,6 +107,8 @@ class SettingsDialog(QDialog):
             self.current_settings.get("model_name", "Parakeet TDT 0.6B v2")
         )
         self._forced_precision: str | None = None
+        self._precision_before_canary: str | None = None
+        self._timestamps_pref = bool(self.current_parakeet_settings.get("include_timestamps", False))
         self._ext_checked = current_ext_checked or {
             ext: True for ext in SUPPORTED_AUDIO_EXTENSIONS
         }
@@ -281,6 +283,7 @@ class SettingsDialog(QDialog):
         self.device_dropdown.currentTextChanged.connect(self._on_device_changed)
         self.precision_dropdown.currentTextChanged.connect(self._check_for_changes)
         self.audio_device_dropdown.currentIndexChanged.connect(self._check_for_changes)
+        self.include_timestamps_cb.toggled.connect(self._on_timestamps_toggled)
         self.include_timestamps_cb.toggled.connect(self._check_for_changes)
         self.include_timestamps_cb.toggled.connect(self._update_segment_duration_enabled)
         self.segment_duration_spin.valueChanged.connect(self._check_for_changes)
@@ -341,10 +344,17 @@ class SettingsDialog(QDialog):
 
         self.audio_device_dropdown.setCurrentIndex(0)
 
+    def _on_timestamps_toggled(self, checked: bool) -> None:
+        self._timestamps_pref = checked
+
     def _on_model_changed(self, *args) -> None:
         new_type = ModelMetadata.get_model_type(self.model_dropdown.currentText())
         if new_type == "canary" and self._last_model_type != "canary":
+            self._precision_before_canary = self.precision_dropdown.currentText()
             self._forced_precision = "float16"
+        elif (new_type != "canary" and self._last_model_type == "canary"
+                and self._precision_before_canary):
+            self._forced_precision = self._precision_before_canary
         self._last_model_type = new_type
         self._update_precision_options()
         self._update_model_description()
@@ -432,6 +442,9 @@ class SettingsDialog(QDialog):
             self.segment_duration_spin.setToolTip(_CANARY_NO_TIMESTAMPS_TIP)
             self._seg_dur_caption.setToolTip(_CANARY_NO_TIMESTAMPS_TIP)
         else:
+            self.include_timestamps_cb.blockSignals(True)
+            self.include_timestamps_cb.setChecked(self._timestamps_pref)
+            self.include_timestamps_cb.blockSignals(False)
             self.include_timestamps_cb.setEnabled(True)
             self.include_timestamps_cb.setToolTip(_TIMESTAMPS_TIP_DEFAULT)
             self._timestamps_caption.setToolTip(_TIMESTAMPS_TIP_DEFAULT)
@@ -465,7 +478,7 @@ class SettingsDialog(QDialog):
 
     def _parakeet_settings_selection_changed(self) -> bool:
         current = {
-            "include_timestamps": self.include_timestamps_cb.isChecked(),
+            "include_timestamps": self._timestamps_pref,
             "segment_duration": self.segment_duration_spin.value(),
         }
         return current != self.current_parakeet_settings
@@ -596,7 +609,7 @@ class SettingsDialog(QDialog):
 
         if self._parakeet_settings_selection_changed():
             settings = {
-                "include_timestamps": self.include_timestamps_cb.isChecked(),
+                "include_timestamps": self._timestamps_pref,
                 "segment_duration": self.segment_duration_spin.value(),
             }
             self.parakeet_settings_changed.emit(settings)
