@@ -757,6 +757,10 @@ class MainWindow(QMainWindow):
         self._server_port = port
         config_manager.set_value("server_port", port)
 
+        if (enabled and self._server_manager.is_running()
+                and port != self._server_manager.port):
+            self._server_manager.stop_server()
+
         if enabled and not self._server_manager.is_running():
             if not self._server_manager.start_server(
                 port,

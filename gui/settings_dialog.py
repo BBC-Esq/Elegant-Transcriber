@@ -564,6 +564,23 @@ class SettingsDialog(QDialog):
                 self._revert_server_toggle(checked=True)
                 return
 
+            current_port = int(self.current_server_settings.get("server_port", 8765))
+            if (wants_server_on and currently_on
+                    and self.server_port_spin.value() != current_port
+                    and self._server_busy_check()):
+                QMessageBox.warning(
+                    self,
+                    "Server busy",
+                    "The server is currently processing a transcription "
+                    "request.\n\nWait for it to finish before changing "
+                    "the port.",
+                )
+                self.server_port_spin.blockSignals(True)
+                self.server_port_spin.setValue(current_port)
+                self.server_port_spin.blockSignals(False)
+                self._check_for_changes()
+                return
+
         if self._model_settings_changed():
             model = self.model_dropdown.currentText()
             precision = self.precision_dropdown.currentText()
