@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-from PySide6.QtCore import QObject, QMutex, QMutexLocker, QThread, Qt, Signal
+from PySide6.QtCore import QObject, QMutex, QMutexLocker, QThread, QTimer, Qt, Signal
 
 
 class _NullWriter:
@@ -357,17 +357,13 @@ class _ModelLoaderThread(QThread):
         return _load_canary_model(local_path, device, torch_dtype)
 
 
-def _unload_model(model) -> None:
-    try:
-        del model
-    except Exception:
-        pass
+def _release_gpu_memory() -> None:
+    gc.collect()
     if torch.cuda.is_available():
         try:
             torch.cuda.empty_cache()
         except Exception:
             pass
-    gc.collect()
 
 
 class ModelManager(QObject):
@@ -468,12 +464,12 @@ class ModelManager(QObject):
                 new_model = _load_parakeet_model(local_path, device, torch_dtype)
 
             if cancel_event is not None and cancel_event.is_set():
-                _unload_model(new_model)
+                del new_model
+                _release_gpu_memory()
                 return None
 
             with QMutexLocker(self._model_mutex):
-                if self._model is not None and self._current_settings.get("_config_key") != config_key:
-                    _unload_model(self._model)
+                old_model = self._model
                 self._model = new_model
                 self._model_version = str(uuid.uuid4())
                 self._current_settings = {
@@ -482,6 +478,8 @@ class ModelManager(QObject):
                     "device_type": device,
                     "_config_key": config_key,
                 }
+            del old_model
+            _release_gpu_memory()
 
             self.server_model_loaded.emit(model_name, precision, device)
             return new_model
@@ -513,12 +511,12 @@ class ModelManager(QObject):
     def _on_model_loaded(self, model, name: str, precision: str, device: str, version: str) -> None:
         if version != self._pending_version:
             logger.info(f"Ignoring stale model load (version {version})")
-            _unload_model(model)
+            del model
+            QTimer.singleShot(0, _release_gpu_memory)
             return
 
         with QMutexLocker(self._model_mutex):
-            if self._model is not None:
-                _unload_model(self._model)
+            old_model = self._model
             self._model = model
             self._model_version = version
             self._current_settings = {
@@ -527,6 +525,8 @@ class ModelManager(QObject):
                 "device_type": device,
                 "_config_key": (name, device, precision),
             }
+        del old_model
+        _release_gpu_memory()
 
         logger.info(f"Model loaded successfully: {name}")
         self.model_loaded.emit(name, precision, device)
@@ -548,9 +548,8 @@ class ModelManager(QObject):
                 t.wait(2000)
 
         with QMutexLocker(self._model_mutex):
-            if self._model is not None:
-                _unload_model(self._model)
-                self._model = None
-                self._model_version = None
+            self._model = None
+            self._model_version = None
+        _release_gpu_memory()
 
         logger.debug("ModelManager cleanup complete")
