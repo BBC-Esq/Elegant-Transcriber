@@ -8,6 +8,10 @@ from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+_COPY_TIP = "Copy the current text to your clipboard"
+_CLEAR_TIP = "Clear the clipboard panel"
+_APPEND_TIP = "Append new transcriptions instead of replacing"
+
 
 class ClipboardSideWindow(QWidget):
     user_closed = Signal()
@@ -48,7 +52,7 @@ class ClipboardSideWindow(QWidget):
         self._copy_btn.setObjectName("copyButton")
         self._copy_btn.setFixedHeight(32)
         self._copy_btn.setMinimumWidth(80)
-        self._copy_btn.setToolTip("Copy the current text to your clipboard")
+        self._copy_btn.setToolTip(_COPY_TIP)
         self._copy_btn.clicked.connect(self._copy_to_clipboard)
         controls.addWidget(self._copy_btn)
 
@@ -56,14 +60,14 @@ class ClipboardSideWindow(QWidget):
         self._clear_btn.setObjectName("clearButton")
         self._clear_btn.setFixedHeight(32)
         self._clear_btn.setMinimumWidth(80)
-        self._clear_btn.setToolTip("Clear the clipboard panel")
+        self._clear_btn.setToolTip(_CLEAR_TIP)
         self._clear_btn.clicked.connect(self._text_display.clear)
         controls.addWidget(self._clear_btn)
 
         controls.addStretch(1)
 
         self._append_checkbox = QCheckBox("Append")
-        self._append_checkbox.setToolTip("Append new transcriptions instead of replacing")
+        self._append_checkbox.setToolTip(_APPEND_TIP)
         self._append_checkbox.setChecked(False)
         self._append_checkbox.toggled.connect(self._on_append_toggled)
         controls.addWidget(self._append_checkbox)
@@ -296,8 +300,13 @@ class ClipboardSideWindow(QWidget):
         self._copy_btn.setEnabled(not enabled)
         self._clear_btn.setEnabled(not enabled)
         self._append_checkbox.setEnabled(not enabled)
-        for w in (self._text_display, self._copy_btn, self._clear_btn, self._append_checkbox):
-            w.setToolTip(tip)
+        for w, default_tip in (
+            (self._text_display, ""),
+            (self._copy_btn, _COPY_TIP),
+            (self._clear_btn, _CLEAR_TIP),
+            (self._append_checkbox, _APPEND_TIP),
+        ):
+            w.setToolTip(tip if enabled else default_tip)
 
     @Slot()
     def _request_dock(self) -> None:
