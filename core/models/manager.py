@@ -22,7 +22,7 @@ class _NullWriter:
 from core.logging_config import get_logger
 from core.exceptions import ModelLoadError
 from core.models.metadata import ModelMetadata
-from download_model import find_local_model, get_local_model_path, MODELS
+from download_model import find_local_model, get_local_model_path, is_snapshot_complete, MODELS
 
 logger = get_logger(__name__)
 
@@ -160,8 +160,8 @@ def _download_model_sync(model_id: str) -> str:
 
     local_path.mkdir(parents=True, exist_ok=True)
     snapshot_download(repo_id=model_id, local_dir=str(local_path))
-    if not (local_path / "config.json").is_file():
-        raise ModelLoadError(f"Download completed but config.json not found at {local_path}")
+    if not is_snapshot_complete(model_id, local_path):
+        raise ModelLoadError(f"Download completed but required files are missing at {local_path}")
     return str(local_path)
 
 
@@ -344,9 +344,9 @@ class _ModelLoaderThread(QThread):
                 local_dir=str(local_path),
             )
 
-        if not (local_path / "config.json").is_file():
+        if not is_snapshot_complete(model_id, local_path):
             raise ModelLoadError(
-                f"Download completed but config.json not found at {local_path}"
+                f"Download completed but required files are missing at {local_path}"
             )
         return str(local_path)
 

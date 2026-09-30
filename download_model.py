@@ -13,9 +13,18 @@ MODELS = {
     "nvidia/canary-qwen-2.5b": None,
 }
 
+SNAPSHOT_REQUIRED_FILES = {
+    "nvidia/canary-qwen-2.5b": ("config.json", "model.safetensors"),
+}
+
 
 def get_models_dir() -> Path:
     return Path(__file__).parent / "models"
+
+
+def is_snapshot_complete(repo_id: str, path: Path) -> bool:
+    required = SNAPSHOT_REQUIRED_FILES.get(repo_id, ("config.json",))
+    return path.is_dir() and all((path / name).is_file() for name in required)
 
 
 def get_local_model_path(repo_id: str):
@@ -37,7 +46,7 @@ def find_local_model(repo_id: str):
         if path.is_file():
             return str(path)
     else:
-        if path.is_dir() and (path / "config.json").is_file():
+        if is_snapshot_complete(repo_id, path):
             return str(path)
     return None
 
@@ -71,7 +80,7 @@ def download_model(repo_id: str) -> str:
             return str(local_path)
         raise RuntimeError(f"Download completed but file not found at {local_path}")
 
-    if local_path.is_dir() and (local_path / "config.json").is_file():
+    if is_snapshot_complete(repo_id, local_path):
         print(f"Model already exists: {local_path}")
         return str(local_path)
 
@@ -83,10 +92,10 @@ def download_model(repo_id: str) -> str:
         local_dir=str(local_path),
     )
 
-    if (local_path / "config.json").is_file():
+    if is_snapshot_complete(repo_id, local_path):
         print(f"Model cached at: {local_path}")
         return str(local_path)
-    raise RuntimeError(f"Download completed but config.json not found at {local_path}")
+    raise RuntimeError(f"Download completed but required files are missing at {local_path}")
 
 
 if __name__ == "__main__":
