@@ -119,6 +119,7 @@ class FilePanelWindow(QWidget):
     docked_changed = Signal(bool)
 
     transcribe_file_requested = Signal(str, str, str, str)
+    single_stop_requested = Signal()
     batch_start_requested = Signal(list, str, str)
     batch_stop_requested = Signal()
 
@@ -465,7 +466,11 @@ class FilePanelWindow(QWidget):
 
     @Slot()
     def _on_stop(self) -> None:
-        self.batch_stop_requested.emit()
+        if self._is_single_mode():
+            self._stop_btn.setEnabled(False)
+            self.single_stop_requested.emit()
+        else:
+            self.batch_stop_requested.emit()
 
     @Slot(int, int, str)
     def update_batch_progress(self, current: int, total: int, message: str) -> None:

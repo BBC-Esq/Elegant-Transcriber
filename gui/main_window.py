@@ -223,6 +223,7 @@ class MainWindow(QMainWindow):
         self.file_panel.transcribe_file_requested.connect(
             self._on_file_panel_transcribe
         )
+        self.file_panel.single_stop_requested.connect(self._cancel_transcription)
         self.file_panel.batch_start_requested.connect(self._on_batch_start)
         self.file_panel.batch_stop_requested.connect(self._on_batch_stop)
 
