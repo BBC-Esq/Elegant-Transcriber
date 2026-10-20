@@ -113,16 +113,6 @@ def _load_canary_model(local_path: str, device: str, torch_dtype) -> object:
          contextlib.redirect_stderr(io.StringIO()):
         from nemo.collections.speechlm2.models import SALM
 
-    try:
-        from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM, Qwen3Model
-        if not hasattr(Qwen3ForCausalLM, '_patched_get_input_embeddings'):
-            Qwen3ForCausalLM._patched_get_input_embeddings = True
-            Qwen3ForCausalLM.get_input_embeddings = lambda self: getattr(self.model, 'embed_tokens', None)
-            Qwen3Model.get_input_embeddings = lambda self: getattr(self, 'embed_tokens', None)
-            logger.info("Applied Qwen3 get_input_embeddings monkey-patch")
-    except (ImportError, AttributeError):
-        pass
-
     stderr_capture = io.StringIO()
     logger.info(f"Loading SALM from: {local_path}")
     with contextlib.redirect_stdout(io.StringIO()), \

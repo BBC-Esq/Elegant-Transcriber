@@ -27,192 +27,28 @@ def patch(file_path, old, new, description):
 
 
 patch(
-    NEMO_ROOT / "collections" / "common" / "tokenizers" / "huggingface" / "auto_tokenizer.py",
-    "from typing import List, Optional\n",
-    "import os\nfrom typing import List, Optional\n",
-    "auto_tokenizer.py: add 'import os'",
+    NEMO_ROOT / "core" / "utils" / "cuda_python_utils.py",
+    """    buf = b" " * size
+    (err,) = nvrtc.nvrtcGetProgramLog(prog, buf)""",
+    """    buf = bytearray(size)
+    (err,) = nvrtc.nvrtcGetProgramLog(prog, buf)""",
+    "cuda_python_utils.py: give NVRTC a writable log buffer instead of the shared b' ' object",
 )
 
 patch(
-    NEMO_ROOT / "collections" / "common" / "tokenizers" / "huggingface" / "auto_tokenizer.py",
-    """            self.tokenizer = AUTOTOKENIZER.from_pretrained(
-                pretrained_model_name_or_path=pretrained_model_name,
-                vocab_file=vocab_file,
-                use_fast=use_fast,
-                trust_remote_code=trust_remote_code,
-            )
-        else:""",
-    """            self.tokenizer = AUTOTOKENIZER.from_pretrained(
-                pretrained_model_name_or_path=pretrained_model_name,
-                vocab_file=vocab_file,
-                use_fast=use_fast,
-                trust_remote_code=trust_remote_code,
-            )
-            if vocab_file and os.path.isfile(vocab_file):
-                try:
-                    with open(vocab_file, 'r', encoding='utf-8') as f:
-                        expected_vocab_size = sum(1 for line in f if line.strip())
-                    if expected_vocab_size > 0 and len(self.tokenizer) != expected_vocab_size:
-                        tokenizer_class = type(self.tokenizer)
-                        self.tokenizer = tokenizer_class.from_pretrained(
-                            pretrained_model_name_or_path=vocab_file,
-                            use_fast=use_fast,
-                        )
-                        logging.info(
-                            f"Loaded tokenizer from custom vocab_file with {len(self.tokenizer)} tokens "
-                            f"(resolved class: {tokenizer_class.__name__})"
-                        )
-                except Exception:
-                    pass
-        else:""",
-    "auto_tokenizer.py: handle transformers>=5.0 ignoring vocab_file kwarg",
+    NEMO_ROOT / "core" / "utils" / "cuda_python_utils.py",
+    """    ptx = b" " * ptxSize
+    (err,) = nvrtc.nvrtcGetPTX(prog, ptx)
+    assert_drv(err)
+
+    ptx = np.char.array(ptx)""",
+    """    ptx = bytearray(ptxSize)
+    (err,) = nvrtc.nvrtcGetPTX(prog, ptx)
+    assert_drv(err)
+
+    ptx = np.char.array(bytes(ptx))""",
+    "cuda_python_utils.py: give NVRTC a writable PTX buffer",
 )
-
-patch(
-    NEMO_ROOT / "collections" / "speechlm2" / "parts" / "hf_hub.py",
-    [
-        """        force_download: bool,
-        proxies: Optional[dict],
-        resume_download: Optional[bool],
-        local_files_only: bool,""",
-        """        force_download: bool,
-        local_files_only: bool,
-        **kwargs,""",
-    ],
-    """        force_download: bool,
-        local_files_only: bool,""",
-    "hf_hub.py: remove proxies/resume_download from function signature",
-)
-
-patch(
-    NEMO_ROOT / "collections" / "speechlm2" / "parts" / "hf_hub.py",
-    """            cache_dir=cache_dir,
-            force_download=force_download,
-            resume_download=resume_download,
-            proxies=proxies,
-            local_files_only=local_files_only,""",
-    """            cache_dir=cache_dir,
-            force_download=force_download,
-            local_files_only=local_files_only,""",
-    "hf_hub.py: remove proxies/resume_download from cached_file call",
-)
-
-patch(
-    NEMO_ROOT / "collections" / "speechlm2" / "parts" / "hf_hub.py",
-    """            force_download=force_download,
-            proxies=proxies,
-            resume_download=resume_download,
-            local_files_only=local_files_only,
-            token=token,
-            map_location=map_location,""",
-    """            force_download=force_download,
-            local_files_only=local_files_only,
-            token=token,
-            map_location=map_location,""",
-    "hf_hub.py: remove proxies/resume_download from super()._from_pretrained call",
-)
-
-patch(
-    NEMO_ROOT / "collections" / "tts" / "models" / "magpietts.py",
-    """            tc_tokenizer = self.tokenizer.tokenizers[self.text_conditioning_tokenizer_name]
-            self.context_text_embedding = nn.Embedding(tc_tokenizer.vocab_size, cfg.embedding_dim)""",
-    """            tc_tokenizer = self.tokenizer.tokenizers[self.text_conditioning_tokenizer_name]
-            tc_vocab_size = tc_tokenizer.vocab_size
-            if hasattr(tc_tokenizer, '_extra_ids'):
-                tc_vocab_size -= tc_tokenizer._extra_ids
-            self.context_text_embedding = nn.Embedding(tc_vocab_size, cfg.embedding_dim)""",
-    "magpietts.py: adjust vocab_size for T5 fast tokenizer sentinel IDs",
-)
-
-patch(
-    NEMO_ROOT / "collections" / "tts" / "models" / "magpietts_preference_optimization.py",
-    "    inputs = inputs.to(device)",
-    "    inputs = inputs.to(device=device, dtype=whisper_model.dtype)",
-    "magpietts_preference_optimization.py: explicit dtype cast for whisper inputs",
-)
-
-patch(
-    NEMO_ROOT / "core" / "classes" / "mixins" / "hf_io_mixin.py",
-    [
-        """        model_filter = dict(
-            author=None,
-            library='nemo',
-            language=None,
-            model_name=None,
-            task=None,
-            tags=None,
-            limit=None,
-            full=None,
-            cardData=False,
-        )""",
-        """        from packaging.version import Version as _V
-        import huggingface_hub as _hfh
-        if _V(_hfh.__version__) >= _V("0.24"):
-            model_filter = dict(
-                author=None,
-                filter=['nemo'],
-                model_name=None,
-                limit=None,
-                full=None,
-                cardData=False,
-            )
-        else:
-            model_filter = dict(
-                author=None,
-                library='nemo',
-                language=None,
-                model_name=None,
-                task=None,
-                tags=None,
-                limit=None,
-                full=None,
-                cardData=False,
-            )""",
-    ],
-    """        model_filter = dict(
-            author=None,
-            filter=['nemo'],
-            model_name=None,
-            limit=None,
-            full=None,
-            cardData=False,
-        )""",
-    "hf_io_mixin.py: use filter=['nemo'] instead of library='nemo' for new huggingface_hub",
-)
-
-patch(
-    NEMO_ROOT / "core" / "classes" / "mixins" / "hf_io_mixin.py",
-    [
-        """            # Make any modifications to the filter as necessary
-            filt['language'] = [...]
-            filt['task'] = ...
-            filt['tags'] = [...]""",
-        """            # Make any modifications to the filter as necessary
-            if 'filter' in filt:
-                filt['filter'].append('en')  # Add language filter
-                filt['filter'].append('automatic-speech-recognition')  # Add task filter
-            else:
-                filt['language'] = [...]
-                filt['task'] = ...
-                filt['tags'] = [...]""",
-    ],
-    """            # Make any modifications to the filter as necessary
-            filt['filter'].append('en')  # Add language filter
-            filt['filter'].append('automatic-speech-recognition')  # Add task filter""",
-    "hf_io_mixin.py: update docstring example for filter API",
-)
-
-
-if PEFT_ROOT is not None:
-    patch(
-        PEFT_ROOT / "utils" / "other.py",
-        "        input_embedding_params = set(model.get_input_embeddings().parameters())",
-        "        _input_emb = model.get_input_embeddings()\n"
-        "        if _input_emb is None:\n"
-        "            return []\n"
-        "        input_embedding_params = set(_input_emb.parameters())",
-        "peft/utils/other.py: handle None return from get_input_embeddings",
-    )
 
 
 def apply_patches():

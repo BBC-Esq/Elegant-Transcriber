@@ -97,7 +97,7 @@ app_libs = [
     "av",
     "psutil",
     "pyside6",
-    "peft>=0.18.0",
+    "peft>=0.20.0",
     "soundfile",
     "sounddevice",
     "pynput",
@@ -107,14 +107,6 @@ app_libs = [
     "python-multipart",
     "pytest",
     "requests",
-]
-
-version_overrides = [
-    "transformers>=5",
-    "huggingface-hub>=1.3.0",
-    "fsspec>=2024.12.0",
-    "protobuf>=6.33,<7",
-    "datasets>=3.2.0",
 ]
 
 
@@ -227,13 +219,6 @@ def install_libraries(libraries, max_retries=5, delay=3):
     )
 
 
-def install_no_deps_libraries(libraries, max_retries=5, delay=3):
-    command = [sys.executable, "-m", "uv", "pip", "install", "--no-deps"] + libraries
-    return _run_install_command(
-        command, f"Installing {len(libraries)} libraries (--no-deps)", max_retries, delay
-    )
-
-
 def run_nemo_patches():
     print("\n\033[92mApplying NeMo compatibility patches:\033[0m")
     try:
@@ -299,18 +284,12 @@ def main():
         sys.exit(1)
 
     print("\n\033[92mStep 2: Installing NeMo toolkit (with all dependencies):\033[0m")
-    success_nemo, attempts_nemo = install_libraries(["nemo_toolkit[asr]>=2.7.0,<2.8.0"])
+    success_nemo, attempts_nemo = install_libraries(["nemo_toolkit[asr]>=3.0.0,<3.1.0"])
     if not success_nemo:
         print(f"\033[91mNeMo installation failed after {attempts_nemo} attempts.\033[0m")
         sys.exit(1)
 
-    print("\n\033[92mStep 3: Upgrading transformers, huggingface-hub, fsspec, protobuf (--no-deps):\033[0m")
-    success_overrides, attempts_overrides = install_no_deps_libraries(version_overrides)
-    if not success_overrides:
-        print(f"\033[91mVersion overrides failed after {attempts_overrides} attempts.\033[0m")
-        sys.exit(1)
-
-    print("\n\033[92mStep 4: Installing app libraries (av, psutil, pyside6, peft, soundfile, sounddevice, pynput, nltk):\033[0m")
+    print("\n\033[92mStep 3: Installing app libraries (av, psutil, pyside6, peft, soundfile, sounddevice, pynput, nltk):\033[0m")
     success_app, attempts_app = install_libraries(app_libs)
     if not success_app:
         print(f"\033[91mApp library installation failed after {attempts_app} attempts.\033[0m")
@@ -318,7 +297,7 @@ def main():
 
     patch_success = run_nemo_patches()
 
-    print("\n\033[92mStep 5: Downloading Parakeet TDT 0.6B v2 model:\033[0m")
+    print("\n\033[92mStep 4: Downloading Parakeet TDT 0.6B v2 model:\033[0m")
     try:
         subprocess.run(
             [sys.executable, "download_model.py", "nvidia/parakeet-tdt-0.6b-v2"],
@@ -332,7 +311,6 @@ def main():
     print("\n----- Installation Summary -----")
     print("\033[92mPyTorch + torchaudio installed successfully.\033[0m")
     print("\033[92mNeMo toolkit installed successfully.\033[0m")
-    print("\033[92mVersion overrides applied (transformers 5+).\033[0m")
     print("\033[92mApp libraries installed successfully.\033[0m")
     if patch_success:
         print("\033[92mNeMo patches applied successfully.\033[0m")
