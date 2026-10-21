@@ -11,7 +11,7 @@ from core.transcription.stitching import stitch_texts_aligned, stitch_words_at_m
 
 
 SR = 16000
-CHUNK_OVERLAP_SECONDS = 7
+CANARY_OVERLAP_SECONDS = 5
 PARAKEET_OVERLAP_SECONDS = 15
 PARAKEET_BATCH_SIZE = 1
 
@@ -20,8 +20,7 @@ def parakeet_overlap_seconds(segment_length_seconds: float) -> float:
     return min(PARAKEET_OVERLAP_SECONDS, segment_length_seconds / 3)
 
 
-def get_chunks(audio: np.ndarray, segment_length_seconds: float,
-               overlap_seconds: float = CHUNK_OVERLAP_SECONDS):
+def get_chunks(audio: np.ndarray, segment_length_seconds: float, overlap_seconds: float):
     segment_samples = int(segment_length_seconds * SR)
     step = segment_samples - int(overlap_seconds * SR)
     if step <= 0:
@@ -178,7 +177,7 @@ def transcribe_canary(
 ) -> str:
     import soundfile as sf
 
-    chunks = get_chunks(audio, segment_length)
+    chunks = get_chunks(audio, segment_length, CANARY_OVERLAP_SECONDS)
     all_texts: list[str] = []
     chunk_spans: list[tuple[float, float]] = []
     temp_files: list[str] = []

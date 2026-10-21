@@ -22,17 +22,21 @@ from pydantic import BaseModel
 
 from config.server_settings import TranscriptionSettings
 from core.models.metadata import ModelMetadata
-from core.transcription.parakeet_core import transcribe_canary, transcribe_text, transcribe_with_timestamps
+from core.transcription.parakeet_core import (
+    CANARY_OVERLAP_SECONDS,
+    transcribe_canary,
+    transcribe_text,
+    transcribe_with_timestamps,
+)
 
 logger = logging.getLogger(__name__)
 
 SR = 16000
-CHUNK_OVERLAP_SECONDS = 7
 CANARY_MAX_CHUNK_LENGTH = 40
 
 # Valid segment_length range, matching the GUI/config validator. Client-supplied
 # values arrive over HTTP without the config-layer clamp, so the server must
-# enforce these bounds itself. A segment_length <= CHUNK_OVERLAP_SECONDS makes
+# enforce these bounds itself. A segment_length <= CANARY_OVERLAP_SECONDS makes
 # Canary's chunking step zero or negative, which get_chunks rejects.
 MIN_SEGMENT_LENGTH = 10
 MAX_SEGMENT_LENGTH = 100
@@ -225,7 +229,7 @@ class ServerTranscriptionWorker:
         # Defensive floor: keep the chunk step (segment_samples -
         # overlap_samples) positive even if settings were built without
         # _build_settings' clamp.
-        return max(seg_len, CHUNK_OVERLAP_SECONDS + 1)
+        return max(seg_len, CANARY_OVERLAP_SECONDS + 1)
 
     def _transcribe_text(self, model, audio: np.ndarray) -> str:
         return transcribe_text(
