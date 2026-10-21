@@ -7,17 +7,27 @@ from typing import List, Tuple
 import numpy as np
 import torch
 
-from core.transcription.stitching import stitch_texts, stitch_timestamp_segments
+from core.transcription.stitching import stitch_texts_aligned, stitch_words_at_midpoints
 
 
 SR = 16000
 CHUNK_OVERLAP_SECONDS = 7
+PARAKEET_OVERLAP_SECONDS = 15
 PARAKEET_BATCH_SIZE = 1
 
 
-def get_chunks(audio: np.ndarray, segment_length_seconds: int):
-    segment_samples = segment_length_seconds * SR
-    overlap_samples = CHUNK_OVERLAP_SECONDS * SR
+def parakeet_overlap_seconds(segment_length_seconds: float) -> float:
+    return min(PARAKEET_OVERLAP_SECONDS, segment_length_seconds / 3)
+
+
+def get_chunks(audio: np.ndarray, segment_length_seconds: float,
+               overlap_seconds: float = CHUNK_OVERLAP_SECONDS):
+    segment_samples = int(segment_length_seconds * SR)
+    step = segment_samples - int(overlap_seconds * SR)
+    if step <= 0:
+        raise ValueError(
+            f"Segment length {segment_length_seconds}s must exceed the {overlap_seconds}s overlap"
+        )
     audio_length = len(audio)
 
     if audio_length <= segment_samples:
@@ -25,18 +35,12 @@ def get_chunks(audio: np.ndarray, segment_length_seconds: int):
 
     chunks = []
     start = 0
-    while start < audio_length:
+    while True:
         end = min(start + segment_samples, audio_length)
-        is_not_first = start > 0
-        chunks.append((audio[start:end], start / SR, is_not_first))
-
-        next_start = start + segment_samples - overlap_samples
-        if next_start >= audio_length:
+        chunks.append((audio[start:end], start / SR, start > 0))
+        if end >= audio_length:
             break
-        if audio_length - next_start < overlap_samples * 2:
-            chunks.append((audio[next_start:audio_length], next_start / SR, True))
-            break
-        start = next_start
+        start += step
 
     return chunks
 
@@ -104,6 +108,43 @@ def group_words_into_segments(
     return grouped
 
 
+def _transcribe_chunk_words(model, chunk_audio: np.ndarray, time_offset: float) -> List[Tuple[float, float, str]]:
+    with torch.inference_mode():
+        hypotheses = model.transcribe(
+            [chunk_audio],
+            batch_size=PARAKEET_BATCH_SIZE,
+            timestamps=True,
+            return_hypotheses=True,
+            verbose=False,
+        )
+    words = extract_word_timestamps(hypotheses, time_offset)
+    if not words:
+        txt = extract_text(hypotheses)
+        if txt:
+            words = [(time_offset, time_offset + len(chunk_audio) / SR, txt)]
+    return words
+
+
+def _transcribe_words(
+    model,
+    audio: np.ndarray,
+    segment_length: float,
+    cancel_check=None,
+    progress_callback=None,
+) -> List[Tuple[float, float, str]]:
+    chunks = get_chunks(audio, segment_length, parakeet_overlap_seconds(segment_length))
+    chunk_words = []
+    chunk_spans = []
+    for i, (chunk_audio, time_offset, _has_overlap) in enumerate(chunks):
+        if cancel_check and cancel_check():
+            break
+        if progress_callback:
+            progress_callback(i, len(chunks))
+        chunk_words.append(_transcribe_chunk_words(model, chunk_audio, time_offset))
+        chunk_spans.append((time_offset, time_offset + len(chunk_audio) / SR))
+    return stitch_words_at_midpoints(chunk_words, chunk_spans)
+
+
 def transcribe_text(
     model,
     audio: np.ndarray,
@@ -111,25 +152,21 @@ def transcribe_text(
     cancel_check=None,
     progress_callback=None,
 ) -> str:
-    chunks = get_chunks(audio, segment_length)
-    all_texts = []
-    had_overlap = []
-    for i, (chunk_audio, _offset, has_overlap) in enumerate(chunks):
-        if cancel_check and cancel_check():
-            break
-        if progress_callback:
-            progress_callback(i, len(chunks))
-        with torch.inference_mode():
-            output = model.transcribe(
-                [chunk_audio],
-                batch_size=PARAKEET_BATCH_SIZE,
-                timestamps=False,
-                verbose=False,
-            )
-        txt = extract_text(output)
-        all_texts.append(txt)
-        had_overlap.append(has_overlap)
-    return stitch_texts(all_texts, had_overlap, "parakeet")
+    if len(audio) > int(segment_length * SR):
+        words = _transcribe_words(model, audio, segment_length, cancel_check, progress_callback)
+        return " ".join(w[2] for w in words)
+    if cancel_check and cancel_check():
+        return ""
+    if progress_callback:
+        progress_callback(0, 1)
+    with torch.inference_mode():
+        output = model.transcribe(
+            [audio],
+            batch_size=PARAKEET_BATCH_SIZE,
+            timestamps=False,
+            verbose=False,
+        )
+    return extract_text(output)
 
 
 def transcribe_canary(
@@ -143,11 +180,11 @@ def transcribe_canary(
 
     chunks = get_chunks(audio, segment_length)
     all_texts: list[str] = []
-    had_overlap: list[bool] = []
+    chunk_spans: list[tuple[float, float]] = []
     temp_files: list[str] = []
 
     try:
-        for i, (chunk_audio, _offset, has_overlap) in enumerate(chunks):
+        for i, (chunk_audio, offset, _has_overlap) in enumerate(chunks):
             if cancel_check and cancel_check():
                 break
             if progress_callback:
@@ -173,7 +210,7 @@ def transcribe_canary(
 
             txt = model.tokenizer.ids_to_text(answer_ids[0].cpu()).strip()
             all_texts.append(txt)
-            had_overlap.append(has_overlap)
+            chunk_spans.append((offset, offset + chunk_duration))
     finally:
         for tf_path in temp_files:
             try:
@@ -181,7 +218,7 @@ def transcribe_canary(
             except OSError:
                 pass
 
-    return stitch_texts(all_texts, had_overlap, "canary")
+    return stitch_texts_aligned(all_texts, chunk_spans)
 
 
 def transcribe_with_timestamps(
@@ -192,32 +229,7 @@ def transcribe_with_timestamps(
     cancel_check=None,
     progress_callback=None,
 ) -> List[Tuple[float, float, str]]:
-    chunks = get_chunks(audio, segment_length)
-    all_chunk_words = []
-    had_overlap = []
-    for i, (chunk_audio, time_offset, has_overlap) in enumerate(chunks):
-        if cancel_check and cancel_check():
-            break
-        if progress_callback:
-            progress_callback(i, len(chunks))
-        with torch.inference_mode():
-            hypotheses = model.transcribe(
-                [chunk_audio],
-                batch_size=PARAKEET_BATCH_SIZE,
-                timestamps=True,
-                return_hypotheses=True,
-                verbose=False,
-            )
-        word_segs = extract_word_timestamps(hypotheses, time_offset)
-        if not word_segs:
-            txt = extract_text(hypotheses)
-            if txt:
-                chunk_end = time_offset + len(chunk_audio) / SR
-                word_segs = [(time_offset, chunk_end, txt)]
-        all_chunk_words.append(word_segs or [])
-        had_overlap.append(has_overlap)
-
-    stitched_words = stitch_timestamp_segments(all_chunk_words, had_overlap)
-    if stitched_words:
-        return group_words_into_segments(stitched_words, max_duration=float(segment_duration))
+    words = _transcribe_words(model, audio, segment_length, cancel_check, progress_callback)
+    if words:
+        return group_words_into_segments(words, max_duration=float(segment_duration))
     return []

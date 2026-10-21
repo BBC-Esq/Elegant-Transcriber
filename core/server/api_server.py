@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from config.server_settings import TranscriptionSettings
 from core.models.metadata import ModelMetadata
-from core.transcription.stitching import stitch_texts, stitch_timestamp_segments
+from core.transcription.parakeet_core import transcribe_canary, transcribe_text, transcribe_with_timestamps
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +33,12 @@ CANARY_MAX_CHUNK_LENGTH = 40
 # Valid segment_length range, matching the GUI/config validator. Client-supplied
 # values arrive over HTTP without the config-layer clamp, so the server must
 # enforce these bounds itself. A segment_length <= CHUNK_OVERLAP_SECONDS makes
-# the chunking step zero or negative, which loops forever and hangs the worker.
+# Canary's chunking step zero or negative, which get_chunks rejects.
 MIN_SEGMENT_LENGTH = 10
 MAX_SEGMENT_LENGTH = 100
 
 # Matches the GUI spinbox and the config validator. An unclamped negative
-# value reaches _group_words_into_segments as max_duration and degenerates
+# value reaches group_words_into_segments as max_duration and degenerates
 # the output into one segment per word.
 MIN_SEGMENT_DURATION = 1
 MAX_SEGMENT_DURATION = 90
@@ -220,188 +220,32 @@ class ServerTranscriptionWorker:
             text = self._transcribe_text(model, audio)
             return {"text": text, "segments": []}
 
-    def _get_chunks(self, audio: np.ndarray) -> List[Tuple[np.ndarray, float, bool]]:
-        seg_len = self.settings.segment_length
-        if self.model_type == "canary":
-            seg_len = min(seg_len, CANARY_MAX_CHUNK_LENGTH)
-        # Defensive floor: guarantee the chunk step (segment_samples -
-        # overlap_samples) stays positive so the loop below can never spin
-        # forever, even if settings were built without _build_settings' clamp.
-        seg_len = max(seg_len, CHUNK_OVERLAP_SECONDS + 1)
-        segment_samples = seg_len * SR
-        overlap_samples = CHUNK_OVERLAP_SECONDS * SR
-        audio_length = len(audio)
-
-        if audio_length <= segment_samples:
-            return [(audio, 0.0, False)]
-
-        chunks = []
-        start = 0
-        while start < audio_length:
-            end = min(start + segment_samples, audio_length)
-            is_not_first = start > 0
-            chunks.append((audio[start:end], start / SR, is_not_first))
-
-            next_start = start + segment_samples - overlap_samples
-            if next_start >= audio_length:
-                break
-            if audio_length - next_start < overlap_samples * 2:
-                chunks.append((audio[next_start:audio_length], next_start / SR, True))
-                break
-            start = next_start
-
-        return chunks
+    def _canary_segment_length(self) -> int:
+        seg_len = min(self.settings.segment_length, CANARY_MAX_CHUNK_LENGTH)
+        # Defensive floor: keep the chunk step (segment_samples -
+        # overlap_samples) positive even if settings were built without
+        # _build_settings' clamp.
+        return max(seg_len, CHUNK_OVERLAP_SECONDS + 1)
 
     def _transcribe_text(self, model, audio: np.ndarray) -> str:
-        chunks = self._get_chunks(audio)
-        all_texts = []
-        had_overlap = []
-        for chunk_audio, _, has_overlap in chunks:
-            if self.cancel_event.is_set():
-                break
-            with torch.inference_mode():
-                output = model.transcribe(
-                    [chunk_audio], batch_size=1, timestamps=False, verbose=False,
-                )
-            all_texts.append(self._extract_text(output))
-            had_overlap.append(has_overlap)
-        return stitch_texts(all_texts, had_overlap, self.model_type)
+        return transcribe_text(
+            model, audio, self.settings.segment_length,
+            cancel_check=self.cancel_event.is_set,
+        )
 
     def _transcribe_canary(self, model, audio: np.ndarray) -> str:
-        import soundfile as sf
-
-        chunks = self._get_chunks(audio)
-        all_texts = []
-        had_overlap = []
-        temp_files = []
-
-        try:
-            for chunk_audio, _, has_overlap in chunks:
-                if self.cancel_event.is_set():
-                    break
-                tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-                temp_files.append(tmp.name)
-                sf.write(tmp.name, chunk_audio, SR)
-                tmp.close()
-
-                chunk_duration = len(chunk_audio) / SR
-                max_tokens = max(128, int(chunk_duration * 10))
-
-                with torch.inference_mode():
-                    answer_ids = model.generate(
-                        prompts=[
-                            [{"role": "user",
-                              "content": f"Transcribe the following: {model.audio_locator_tag}",
-                              "audio": [tmp.name]}]
-                        ],
-                        max_new_tokens=max_tokens,
-                    )
-                txt = model.tokenizer.ids_to_text(answer_ids[0].cpu()).strip()
-                all_texts.append(txt)
-                had_overlap.append(has_overlap)
-        finally:
-            for tf_path in temp_files:
-                try:
-                    os.remove(tf_path)
-                except OSError:
-                    pass
-
-        return stitch_texts(all_texts, had_overlap, self.model_type)
+        return transcribe_canary(
+            model, audio, self._canary_segment_length(),
+            cancel_check=self.cancel_event.is_set,
+        )
 
     def _transcribe_with_timestamps(
         self, model, audio: np.ndarray
     ) -> List[Tuple[float, float, str]]:
-        chunks = self._get_chunks(audio)
-        all_chunk_words = []
-        had_overlap = []
-        for chunk_audio, time_offset, has_overlap in chunks:
-            if self.cancel_event.is_set():
-                break
-            with torch.inference_mode():
-                hypotheses = model.transcribe(
-                    [chunk_audio], batch_size=1, timestamps=True,
-                    return_hypotheses=True, verbose=False,
-                )
-            word_segs = self._extract_word_timestamps(hypotheses, time_offset)
-            if not word_segs:
-                txt = self._extract_text(hypotheses)
-                if txt:
-                    chunk_end = time_offset + len(chunk_audio) / SR
-                    word_segs = [(time_offset, chunk_end, txt)]
-            all_chunk_words.append(word_segs or [])
-            had_overlap.append(has_overlap)
-
-        stitched_words = stitch_timestamp_segments(all_chunk_words, had_overlap)
-        if stitched_words:
-            return self._group_words_into_segments(
-                stitched_words, max_duration=float(self.settings.segment_duration)
-            )
-        return []
-
-    @staticmethod
-    def _extract_text(output) -> str:
-        if not output:
-            return ""
-        if isinstance(output, (list, tuple)):
-            first = output[0]
-            if isinstance(first, str):
-                return first.strip()
-            if hasattr(first, "text"):
-                return first.text.strip()
-            return str(first).strip()
-        return str(output).strip()
-
-    def _extract_word_timestamps(
-        self, output, time_offset: float
-    ) -> List[Tuple[float, float, str]]:
-        segments = []
-        if not output or not isinstance(output, (list, tuple)):
-            return segments
-        hyp = output[0]
-        if not hasattr(hyp, "timestamp") or not hyp.timestamp:
-            return segments
-        ts = hyp.timestamp
-        if not isinstance(ts, dict):
-            return segments
-        word_ts = ts.get("word", []) or ts.get("segment", [])
-        for entry in word_ts:
-            start = entry.get("start", 0) + time_offset
-            end = entry.get("end", start) + time_offset
-            text = (
-                entry.get("word", "") or entry.get("char", "")
-                or entry.get("segment", "")
-            )
-            if text.strip():
-                segments.append((start, end, text.strip()))
-        return segments
-
-    @staticmethod
-    def _group_words_into_segments(
-        word_segments: List[Tuple[float, float, str]],
-        max_duration: float = 10.0,
-    ) -> List[Tuple[float, float, str]]:
-        if not word_segments:
-            return []
-        grouped = []
-        current_words = []
-        current_start = word_segments[0][0]
-        for start, end, word in word_segments:
-            if current_words and (end - current_start) > max_duration:
-                grouped.append((
-                    current_start,
-                    current_words[-1][1],
-                    " ".join(w[2] for w in current_words),
-                ))
-                current_words = []
-                current_start = start
-            current_words.append((start, end, word))
-        if current_words:
-            grouped.append((
-                current_start,
-                current_words[-1][1],
-                " ".join(w[2] for w in current_words),
-            ))
-        return grouped
+        return transcribe_with_timestamps(
+            model, audio, self.settings.segment_length, self.settings.segment_duration,
+            cancel_check=self.cancel_event.is_set,
+        )
 
 
 async def _queue_worker(queue: asyncio.Queue, cancel_event: Event):
