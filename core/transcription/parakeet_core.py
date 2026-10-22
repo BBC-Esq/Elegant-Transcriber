@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import tempfile
 from typing import List, Tuple
 
 import numpy as np
@@ -175,47 +173,36 @@ def transcribe_canary(
     cancel_check=None,
     progress_callback=None,
 ) -> str:
-    import soundfile as sf
-
     chunks = get_chunks(audio, segment_length, CANARY_OVERLAP_SECONDS)
     all_texts: list[str] = []
     chunk_spans: list[tuple[float, float]] = []
-    temp_files: list[str] = []
+    prompt = [{
+        "role": "user",
+        "content": f"Transcribe the following: {model.audio_locator_tag}",
+    }]
 
-    try:
-        for i, (chunk_audio, offset, _has_overlap) in enumerate(chunks):
-            if cancel_check and cancel_check():
-                break
-            if progress_callback:
-                progress_callback(i, len(chunks))
+    for i, (chunk_audio, offset, _has_overlap) in enumerate(chunks):
+        if cancel_check and cancel_check():
+            break
+        if progress_callback:
+            progress_callback(i, len(chunks))
 
-            tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-            temp_files.append(tmp.name)
-            sf.write(tmp.name, chunk_audio, SR)
-            tmp.close()
+        chunk_duration = len(chunk_audio) / SR
+        max_tokens = max(128, int(chunk_duration * 10))
+        audios = torch.from_numpy(np.ascontiguousarray(chunk_audio, dtype=np.float32)).unsqueeze(0).to(model.device)
+        audio_lens = torch.tensor([audios.shape[1]], device=model.device)
 
-            chunk_duration = len(chunk_audio) / SR
-            max_tokens = max(128, int(chunk_duration * 10))
+        with torch.inference_mode():
+            answer_ids = model.generate(
+                prompts=[prompt],
+                audios=audios,
+                audio_lens=audio_lens,
+                max_new_tokens=max_tokens,
+            )
 
-            with torch.inference_mode():
-                answer_ids = model.generate(
-                    prompts=[[{
-                        "role": "user",
-                        "content": f"Transcribe the following: {model.audio_locator_tag}",
-                        "audio": [tmp.name],
-                    }]],
-                    max_new_tokens=max_tokens,
-                )
-
-            txt = model.tokenizer.ids_to_text(answer_ids[0].cpu()).strip()
-            all_texts.append(txt)
-            chunk_spans.append((offset, offset + chunk_duration))
-    finally:
-        for tf_path in temp_files:
-            try:
-                os.remove(tf_path)
-            except OSError:
-                pass
+        txt = model.tokenizer.ids_to_text(answer_ids[0].cpu()).strip()
+        all_texts.append(txt)
+        chunk_spans.append((offset, offset + chunk_duration))
 
     return stitch_texts_aligned(all_texts, chunk_spans)
 
