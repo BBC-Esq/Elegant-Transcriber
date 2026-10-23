@@ -2,6 +2,8 @@ import re
 from difflib import SequenceMatcher
 from typing import List, Tuple
 
+MIN_MATCHED_RUN = 3
+
 
 def _normalize_word(word: str) -> str:
     return re.sub(r'[^\w]', '', word).lower()
@@ -35,10 +37,10 @@ def stitch_texts_aligned(texts: List[str], spans: List[Tuple[float, float]]) -> 
         matcher = SequenceMatcher(
             None, _normalize_words(words[-tail_len:]), _normalize_words(head), autojunk=False
         )
-        pairs = [(b.a + k, b.b + k) for b in matcher.get_matching_blocks() for k in range(b.size)]
-        if len(pairs) >= 2:
-            tail_idx, head_idx = pairs[len(pairs) // 2]
-            cut = len(words) - tail_len + tail_idx
+        run = matcher.find_longest_match(0, tail_len, 0, len(head))
+        if run.size >= MIN_MATCHED_RUN:
+            cut = len(words) - tail_len + run.a + run.size // 2
+            head_idx = run.b + run.size // 2
         else:
             cut = len(words) - min(len(words), round(overlap / 2 * prev_rate))
             head_idx = round(overlap / 2 * curr_rate)
