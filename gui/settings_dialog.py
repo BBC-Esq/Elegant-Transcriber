@@ -56,7 +56,7 @@ _CANARY_NO_TIMESTAMPS_TIP = (
     "timestamped output.</qt>"
 )
 _CANARY_CPU_DISABLED_TIP = (
-    "<qt>Canary is heavy (~11 GB VRAM,<br>"
+    "<qt>Canary is heavy (~6 GB VRAM,<br>"
     "~30x slower than Parakeet) and is<br>"
     "disabled on CPU. Switch to CUDA to<br>"
     "use this model.</qt>"

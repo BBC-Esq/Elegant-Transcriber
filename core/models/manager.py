@@ -90,9 +90,9 @@ def _load_parakeet_model(local_path: str, device: str, torch_dtype) -> object:
     if captured:
         logger.info(f"Model load stderr: {captured[:500]}")
 
-    model = model.to(device)
     if device == "cuda" and torch_dtype != torch.float32:
         model = model.to(dtype=torch_dtype)
+    model = model.to(device)
     model.eval()
 
     _noop = lambda *a, **kw: None
@@ -123,9 +123,9 @@ def _load_canary_model(local_path: str, device: str, torch_dtype) -> object:
     if captured:
         logger.info(f"Model load stderr: {captured[:500]}")
 
-    model = model.to(device)
     if device == "cuda" and torch_dtype != torch.float32:
         model = model.to(dtype=torch_dtype)
+    model = model.to(device)
     model.eval()
 
     logger.info(f"Canary-Qwen model loaded successfully on {device}")

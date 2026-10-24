@@ -37,7 +37,7 @@ class ModelMetadata:
             model_id="nvidia/canary-qwen-2.5b",
             description=(
                 "English only. Higher accuracy than Parakeet but ~30x slower and "
-                "requires ~11 GB VRAM. Does not support timestamps."
+                "requires ~6 GB VRAM. Does not support timestamps."
             ),
             model_type="canary",
             precisions=["bfloat16", "float16"],
@@ -112,7 +112,7 @@ class ModelMetadata:
     @staticmethod
     def _vram_estimate(model_type: str, precision: str) -> str:
         if model_type == "canary":
-            return "~10.9 GB" if precision in ("bfloat16", "float16") else "~18 GB"
+            return "~5.9 GB" if precision in ("bfloat16", "float16") else "~18 GB"
         return "~1.5 GB" if precision in ("bfloat16", "float16") else "~2.5 GB"
 
     @classmethod

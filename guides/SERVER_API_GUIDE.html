@@ -694,7 +694,7 @@ the quarterly results and our plans for the upcoming product launch.</span></cod
   <tbody>
     <tr><td>Parakeet TDT 0.6B v2</td><td>Yes</td><td>Fast</td><td>High (English)</td><td>~1.5 GB</td></tr>
     <tr><td>Parakeet TDT 0.6B v3</td><td>Yes</td><td>Fast</td><td>Slightly lower English, multilingual</td><td>~1.5 GB</td></tr>
-    <tr><td>Canary-Qwen 2.5B</td><td>No</td><td>~30x slower</td><td>Highest (English)</td><td>~11 GB (CUDA only; <code>float32</code> not supported)</td></tr>
+    <tr><td>Canary-Qwen 2.5B</td><td>No</td><td>~30x slower</td><td>Highest (English)</td><td>~6 GB (CUDA only; <code>float32</code> not supported)</td></tr>
   </tbody>
 </table>
 
@@ -787,7 +787,7 @@ models <span class="op">=</span> r.<span class="fn">json</span>()
         <span class="str">"model_id"</span>: <span class="str">"nvidia/canary-qwen-2.5b"</span>,
         <span class="str">"precision"</span>: <span class="str">"bfloat16"</span>,
         <span class="str">"model_type"</span>: <span class="str">"canary"</span>,
-        <span class="str">"avg_vram_usage"</span>: <span class="str">"~10.9 GB"</span>,
+        <span class="str">"avg_vram_usage"</span>: <span class="str">"~5.9 GB"</span>,
         <span class="str">"default_segment_length"</span>: <span class="num">30</span>,
         <span class="str">"supports_timestamps"</span>: <span class="kw">false</span>
     },
@@ -1380,7 +1380,7 @@ Note: The output_format parameter (txt, srt, vtt, json) only affects file output
 |----------------------|------------|------------|---------------------------------|----------|
 | Parakeet TDT 0.6B v2| Yes        | Fast       | High (English)                  | ~1.5 GB  |
 | Parakeet TDT 0.6B v3| Yes        | Fast       | Slightly lower English, multi   | ~1.5 GB  |
-| Canary-Qwen 2.5B    | No         | ~30x slower| Highest (English)               | ~11 GB   |
+| Canary-Qwen 2.5B    | No         | ~30x slower| Highest (English)               | ~6 GB    |
 
 Important: Canary-Qwen does not support timestamps. If you request word_timestamps=true with Canary, the segments field will be empty and text will still contain the full transcription. Canary also has a hard maximum audio chunk length of 40 seconds (enforced automatically).
 
@@ -1469,7 +1469,7 @@ Returns a dictionary keyed by model display name. Each entry looks like:
         "model_id": "nvidia/canary-qwen-2.5b",
         "precision": "bfloat16",
         "model_type": "canary",
-        "avg_vram_usage": "~10.9 GB",
+        "avg_vram_usage": "~5.9 GB",
         "default_segment_length": 30,
         "supports_timestamps": false
     }
