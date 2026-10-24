@@ -42,8 +42,8 @@ def stitch_texts_aligned(texts: List[str], spans: List[Tuple[float, float]]) -> 
             cut = len(words) - tail_len + run.a + run.size // 2
             head_idx = run.b + run.size // 2
         else:
-            cut = len(words) - min(len(words), round(overlap / 2 * prev_rate))
-            head_idx = round(overlap / 2 * curr_rate)
+            cut = len(words)
+            head_idx = 0
 
         words = words[:cut] + current[head_idx:]
         last = i
