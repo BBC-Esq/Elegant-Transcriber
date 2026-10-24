@@ -13,6 +13,8 @@
 
 ## Installation
 
+> GPU mode needs an NVIDIA GeForce GTX 16 / RTX 20 series card or newer, with driver version 580 or newer. Other computers can run it on the CPU.
+
 ### 1. Windows (installer)
 > Download and run [```Elegant_Transcriber_Setup.exe```](https://github.com/BBC-Esq/Elegant-Audio-Transcriber/releases/latest/download/Elegant_Transcriber_Setup.exe) (right-click and run as administrator)
 

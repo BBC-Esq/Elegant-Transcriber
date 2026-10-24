@@ -11,85 +11,45 @@ AUTO_YES = "--yes" in sys.argv or "-y" in sys.argv
 torch_urls = {
     "windows": {
         "cp310": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torch-2.9.0%2Bcu128-cp310-cp310-win_amd64.whl#sha256=397bfff20d46d22692726ca3450f9194a687244fce8fc01b755bf29d715485ee",
-            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp310-cp310-win_amd64.whl#sha256=96f3f7aa4eb9e7fc5af8a722eaf1e5e32e3039dbafe817178d7b90a8566be32d",
+            "GPU": "https://download.pytorch.org/whl/cu130/torch-2.14.1%2Bcu130-cp310-cp310-win_amd64.whl#sha256=af506e69a93c4769f00a3b1ab06f6e5c3a0c81d8dcea68663331a1b74a21f1fc",
+            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp310-cp310-win_amd64.whl#sha256=bda7043ec45539b1b61538af468e19854b72ac6be8d6fde2f51dfd0c91721568",
         },
         "cp311": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torch-2.9.0%2Bcu128-cp311-cp311-win_amd64.whl#sha256=dc6f6c6e7d7eed20c687fc189754a6ea6bf2da9c64eff59fd6753b80ed4bca05",
-            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp311-cp311-win_amd64.whl#sha256=389e1e0b8083fd355f7caf5ba82356b5e01c318998bd575dbf2285a0d8137089",
+            "GPU": "https://download.pytorch.org/whl/cu130/torch-2.14.1%2Bcu130-cp311-cp311-win_amd64.whl#sha256=e98711737150b5a6451cbbfdb425abd5d1bea77f4a1a5d29c48d5ec41cd54949",
+            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp311-cp311-win_amd64.whl#sha256=d14b0c8a66345b7ba43adfa86fc20d89087a0a92e440004755d49d2468ddc6e0",
         },
         "cp312": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torch-2.9.0%2Bcu128-cp312-cp312-win_amd64.whl#sha256=c97dc47a1f64745d439dd9471a96d216b728d528011029b4f9ae780e985529e0",
-            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp312-cp312-win_amd64.whl#sha256=e438061b87ec7dd6018fca9f975219889aa0a3f6cdc3ea10dd0ae2bc7f1c47ce",
+            "GPU": "https://download.pytorch.org/whl/cu130/torch-2.14.1%2Bcu130-cp312-cp312-win_amd64.whl#sha256=0a09031e93632d14ef49553acd6211ece3ae9cdc0969a369b8c24e3cc4d15be9",
+            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-win_amd64.whl#sha256=c52adc3bd526ff7fc5bdcc58fc4a76e6214d09951b646ffe5256ebd7ba60cef1",
         },
         "cp313": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torch-2.9.0%2Bcu128-cp313-cp313-win_amd64.whl#sha256=9cba9f0fa2e1b70fffdcec1235a1bb727cbff7e7b118ba111b2b7f984b7087e2",
-            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp313-cp313-win_amd64.whl#sha256=728372e3f58c5826445f677746e5311c1935c1a7c59599f73a49ded850e038e8",
+            "GPU": "https://download.pytorch.org/whl/cu130/torch-2.14.1%2Bcu130-cp313-cp313-win_amd64.whl#sha256=f064c797bb497daf2b2b5e32b6d794abef087e3f24e758e6c6f8010bd2698319",
+            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp313-cp313-win_amd64.whl#sha256=4eec5a4fadd7a18f9c75b97fdb374fbb579ce4b1604bf66eeb14dc2201d54def",
         },
     },
     "linux": {
         "cp310": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torch-2.9.0%2Bcu128-cp310-cp310-manylinux_2_28_x86_64.whl#sha256=816540286fce245a8af3904a194a83af9c9292ad7452eb79160b7a3b1cefb7e3",
-            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp310-cp310-manylinux_2_28_x86_64.whl#sha256=bd2a257e670ede9fc01c6d76dccdc473040913b8e9328169bf177dbdc38e2484",
+            "GPU": "https://download.pytorch.org/whl/cu130/torch-2.14.1%2Bcu130-cp310-cp310-manylinux_2_28_x86_64.whl#sha256=524039bee1fdb7e96f943768335ba964a8ad2a7d5e41525da6dc4897ae27ed16",
+            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp310-cp310-manylinux_2_28_x86_64.whl#sha256=4ce2a6ae7d302bba56ef7c5c92d9f752728896cfe2626a7f3e5293f879e36650",
         },
         "cp311": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torch-2.9.0%2Bcu128-cp311-cp311-manylinux_2_28_x86_64.whl#sha256=e97c264478c9fc48f91832749d960f1e349aeb214224ebe65fb09435dd64c59a",
-            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl#sha256=add3e93ecc1eeaa6853f6a973ce60ffb3cb14ed2e80f5055e139b09385dce0a7",
+            "GPU": "https://download.pytorch.org/whl/cu130/torch-2.14.1%2Bcu130-cp311-cp311-manylinux_2_28_x86_64.whl#sha256=9023b6a538714e370fe9e027fc20c5c600bbe3759b79d9a1a6f07e73c40db8d0",
+            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl#sha256=5e38154c8896d426a5df58bf2276b603e82184dfae4f54d77dbb212f36e34f37",
         },
         "cp312": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torch-2.9.0%2Bcu128-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=87c62d3b95f1a2270bd116dbd47dc515c0b2035076fbb4a03b4365ea289e89c4",
-            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=28f6eb31b08180a5c5e98d5bc14eef6909c9f5a1dbff9632c3e02a8773449349",
+            "GPU": "https://download.pytorch.org/whl/cu130/torch-2.14.1%2Bcu130-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=5359b255ac68c0cabb8293952b38e00f0d1a570815cd87f19b61af702c071410",
+            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=5a6363570c753812540a05eb82380e329469cbe668643e88111414c12627711f",
         },
         "cp313": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torch-2.9.0%2Bcu128-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=97def0087f8ef171b9002ea500baffdd440c7bdd559c23c38bbf8781b67e9364",
-            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=6c9b217584400963d5b4daddb3711ec7a3778eab211e18654fba076cce3b8682",
-        },
-    },
-}
-
-torchaudio_urls = {
-    "windows": {
-        "cp310": {
-            "GPU": "https://download-r2.pytorch.org/whl/cu128/torchaudio-2.9.0%2Bcu128-cp310-cp310-win_amd64.whl#sha256=1bd69bed6b447079b7ea738236af1e4b24f8efd5178d7ba99bec7a2d9a2c9493",
-            "CPU": "https://download-r2.pytorch.org/whl/cpu/torchaudio-2.9.0%2Bcpu-cp310-cp310-win_amd64.whl#sha256=fb17c9fad41099337f817c597e616bd1396a3f638af391d447a7736833c351ed",
-        },
-        "cp311": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torchaudio-2.9.0%2Bcu128-cp311-cp311-win_amd64.whl",
-            "CPU": "https://download.pytorch.org/whl/cpu/torchaudio-2.9.0%2Bcpu-cp311-cp311-win_amd64.whl",
-        },
-        "cp312": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torchaudio-2.9.0%2Bcu128-cp312-cp312-win_amd64.whl",
-            "CPU": "https://download.pytorch.org/whl/cpu/torchaudio-2.9.0%2Bcpu-cp312-cp312-win_amd64.whl",
-        },
-        "cp313": {
-            "GPU": "https://download.pytorch.org/whl/cu128/torchaudio-2.9.0%2Bcu128-cp313-cp313-win_amd64.whl",
-            "CPU": "https://download.pytorch.org/whl/cpu/torchaudio-2.9.0%2Bcpu-cp313-cp313-win_amd64.whl",
-        },
-    },
-    "linux": {
-        "cp310": {
-            "GPU": "https://download-r2.pytorch.org/whl/cu128/torchaudio-2.9.0%2Bcu128-cp310-cp310-manylinux_2_28_x86_64.whl#sha256=2d924f6b919a25841eedba3a7921b38e3bab8b86b2cf23841e330633dc2ec4df",
-            "CPU": "https://download-r2.pytorch.org/whl/cpu/torchaudio-2.9.0%2Bcpu-cp310-cp310-manylinux_2_28_x86_64.whl#sha256=1b3c522589ae3f09e95eabe9cd49e0a13d06fca41ccba6f9eba1b6b746a9ba45",
-        },
-        "cp311": {
-            "GPU": "https://download-r2.pytorch.org/whl/cu128/torchaudio-2.9.0%2Bcu128-cp311-cp311-manylinux_2_28_x86_64.whl#sha256=b0f04dec9117779a6377c5501c86fc069a427af002c85f0846943d684bba2f23",
-            "CPU": "https://download-r2.pytorch.org/whl/cpu/torchaudio-2.9.0%2Bcpu-cp311-cp311-manylinux_2_28_x86_64.whl#sha256=bd47fa5f76602b30b7b7278be3536899e12e66a26658beb5bac72c49b32f6f65",
-        },
-        "cp312": {
-            "GPU": "https://download-r2.pytorch.org/whl/cu128/torchaudio-2.9.0%2Bcu128-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=ff838b3171be6ef4e4564e2814533816242a6dbea48517b3722785687169376b",
-            "CPU": "https://download-r2.pytorch.org/whl/cpu/torchaudio-2.9.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=541c558c90e0781e8ba3d36319a3484acc5da0f502a605af19b0adc2848556a3",
-        },
-        "cp313": {
-            "GPU": "https://download-r2.pytorch.org/whl/cu128/torchaudio-2.9.0%2Bcu128-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=ea76a708a5a94a5c6cbbf3229e584830268b4765fb01ae8230f1b6744253a20f",
-            "CPU": "https://download-r2.pytorch.org/whl/cpu/torchaudio-2.9.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=20c0585786f69a182687ee6c3ab76c0ca8e5bf7b209015022e74ee67cda38af4",
+            "GPU": "https://download.pytorch.org/whl/cu130/torch-2.14.1%2Bcu130-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=3a78ea0a4d6605c1e351b33ab8aabe44ddb815239cec00cc6f85555d26c0a5a5",
+            "CPU": "https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=331fa474e26e428e2e6af1143b2fdab19cee492d7d21897b8899ce1c14755662",
         },
     },
 }
 
 gpu_libs = [
-    "nvidia-cuda-runtime-cu12==12.8.90",
-    "nvidia-cublas-cu12==12.8.4.1",
-    "nvidia-cudnn-cu12==9.10.2.21",
+    "cuda-bindings==13.0.3",
+    "nvidia-cuda-nvrtc==13.0.88",
     "nvidia-ml-py",
 ]
 
@@ -213,7 +173,7 @@ def _run_install_command(command, label, max_retries, delay):
 
 
 def install_libraries(libraries, max_retries=5, delay=3):
-    command = [sys.executable, "-m", "uv", "pip", "install"] + libraries
+    command = [sys.executable, "-m", "uv", "pip", "install", "--link-mode", "copy"] + libraries
     return _run_install_command(
         command, f"Installing {len(libraries)} libraries", max_retries, delay
     )
@@ -270,14 +230,11 @@ def main():
     print("\033[92mUpgrading pip, setuptools, and wheel:\033[0m")
     upgrade_pip_setuptools_wheel()
 
-    torch_libs = [
-        torch_urls[PLATFORM][python_version][hardware_type],
-        torchaudio_urls[PLATFORM][python_version][hardware_type],
-    ]
+    torch_libs = [torch_urls[PLATFORM][python_version][hardware_type]]
     if hardware_type == "GPU":
         torch_libs += gpu_libs
 
-    print(f"\033[92mStep 1: Installing PyTorch + torchaudio ({hardware_type}):\033[0m")
+    print(f"\033[92mStep 1: Installing PyTorch ({hardware_type}):\033[0m")
     success, attempts = install_libraries(torch_libs)
     if not success:
         print(f"\033[91mPyTorch installation failed after {attempts} attempts.\033[0m")
@@ -309,7 +266,7 @@ def main():
         model_download_success = False
 
     print("\n----- Installation Summary -----")
-    print("\033[92mPyTorch + torchaudio installed successfully.\033[0m")
+    print("\033[92mPyTorch installed successfully.\033[0m")
     print("\033[92mNeMo toolkit installed successfully.\033[0m")
     print("\033[92mApp libraries installed successfully.\033[0m")
     if patch_success:

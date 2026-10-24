@@ -1,33 +1,35 @@
 # Elegant Transcriber - GPU Requirements
-# Note: PyTorch and torchaudio are installed separately via wheel URL in setup-app.ps1
+# Note: PyTorch is installed separately via wheel URL in setup-app.ps1
 #
 # Versions are pinned to the set this app is developed and tested against, so a
 # fresh install reproduces that environment instead of whatever PyPI serves that
 # day. Floating them has broken installs twice: numba backtracking to an
 # unbuildable sdist, and transformers raising its tokenizers floor.
 
-# NVIDIA CUDA libraries
-nvidia-cuda-runtime-cu12==12.8.90
-nvidia-cublas-cu12==12.8.4.1
-nvidia-cudnn-cu12==9.10.2.21
-nvidia-ml-py==13.595.45
+# NVIDIA libraries. The torch wheel bundles its own CUDA 13.0 runtime, cuBLAS and
+# cuDNN. NeMo's CUDA-graph decoding loads NVRTC through cuda-bindings; both stay on
+# the CUDA 13.0 line so they match torch and work with driver 580 and newer.
+cuda-bindings==13.0.3
+nvidia-cuda-nvrtc==13.0.88
+nvidia-ml-py==13.615.71
 
 # NeMo toolkit (installs all transitive deps automatically)
 nemo_toolkit[asr]==3.0.0
-transformers==5.20.1
-huggingface-hub==1.33.0
+transformers==5.20.2
+huggingface-hub==2.3.0
 safetensors==0.8.0
 datasets==5.1.0
+# lightning 2.4.0, the newest NeMo 3.0 accepts, requires fsspec<2026.
 fsspec==2025.12.0
 protobuf==7.36.2
 lhotse==1.33.0
 librosa==1.0.0
 
-# No numba wheel supports numpy 2.5+, and an unpinned resolve backtracks to
-# numba 0.53.1, an sdist whose build fails on Python 3.12.
-numba==0.65.0
-llvmlite==0.47.0
-numpy==2.4.4
+# An unpinned resolve can backtrack to numba 0.53.1, an sdist whose build fails
+# on Python 3.12. numba 0.67 is the first release that accepts numpy 2.5.
+numba==0.68.0
+llvmlite==0.50.0
+numpy==2.5.4
 
 # Must stay inside the range the pinned transformers accepts
 # (>=0.23.1,<0.24.0), or model loading fails at launch.
@@ -35,15 +37,15 @@ tokenizers==0.23.3
 
 # Canary-Qwen dependencies
 peft==0.21.2
-soundfile==0.13.1
+soundfile==0.14.0
 
 # App-specific libraries
-av==17.0.0
+av==19.0.2
 psutil==7.2.2
-PySide6==6.11.0
-sounddevice==0.5.5
-pynput==1.8.1
-nltk==3.9.4
-fastapi==0.136.0
-uvicorn[standard]==0.44.0
-python-multipart==0.0.26
+PySide6==6.12.0
+sounddevice==0.5.6
+pynput==1.8.2
+nltk==3.10.4
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
