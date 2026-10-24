@@ -1,6 +1,6 @@
 <div align="center">
 
-<img width="768" height="512" alt="image" src="https://github.com/user-attachments/assets/1f37e28e-cf7c-4a0a-8f57-029ba0ee312a" />
+<img width="768" height="512" alt="Cartoon race: IBM Granite and NVIDIA Parakeet cross the finish line first, Whisper trails, and Qwen ASR reads for accuracy" src="assets/readme_banner.png" />
 
 </div>
 
