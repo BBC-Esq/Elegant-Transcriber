@@ -6,6 +6,33 @@ from typing import Dict, List
 
 PARAKEET_CHUNK_LENGTH = 90
 CANARY_CHUNK_LENGTH = 40
+TURBOCTC_CHUNK_LENGTH = 45
+
+
+@dataclass(frozen=True)
+class ModelFamily:
+    chunk_length: int
+    min_chunk_length: int
+    max_chunk_length: int
+    supports_timestamps: bool
+    cpu_allowed: bool
+    configurable_chunk_length: bool = False
+
+
+FAMILIES: Dict[str, ModelFamily] = {
+    "parakeet": ModelFamily(
+        chunk_length=PARAKEET_CHUNK_LENGTH, min_chunk_length=10, max_chunk_length=100,
+        supports_timestamps=True, cpu_allowed=True, configurable_chunk_length=True,
+    ),
+    "canary": ModelFamily(
+        chunk_length=CANARY_CHUNK_LENGTH, min_chunk_length=6, max_chunk_length=CANARY_CHUNK_LENGTH,
+        supports_timestamps=False, cpu_allowed=False,
+    ),
+    "turboctc": ModelFamily(
+        chunk_length=TURBOCTC_CHUNK_LENGTH, min_chunk_length=10, max_chunk_length=100,
+        supports_timestamps=True, cpu_allowed=True,
+    ),
+}
 
 
 @dataclass
@@ -15,6 +42,7 @@ class ModelInfo:
     description: str
     model_type: str = "parakeet"
     precisions: list[str] = field(default_factory=lambda: ["bfloat16", "float16", "float32"])
+    vram: dict[str, str] = field(default_factory=dict)
 
 
 class ModelMetadata:
@@ -25,12 +53,14 @@ class ModelMetadata:
             model_id="nvidia/parakeet-tdt-0.6b-v2",
             description="English only. Higher accuracy for English transcription than v3.",
             model_type="parakeet",
+            vram={"bfloat16": "~1.5 GB", "float16": "~1.5 GB", "float32": "~2.5 GB"},
         ),
         ModelInfo(
             name="Parakeet TDT 0.6B v3",
             model_id="nvidia/parakeet-tdt-0.6b-v3",
             description="Multilingual. Slightly lower English accuracy than v2.",
             model_type="parakeet",
+            vram={"bfloat16": "~1.5 GB", "float16": "~1.5 GB", "float32": "~2.5 GB"},
         ),
         ModelInfo(
             name="Canary-Qwen 2.5B",
@@ -41,6 +71,19 @@ class ModelMetadata:
             ),
             model_type="canary",
             precisions=["bfloat16", "float16"],
+            vram={"bfloat16": "~5.9 GB", "float16": "~5.9 GB"},
+        ),
+        ModelInfo(
+            name="Granite Speech 5.0 470M TurboCTC",
+            model_id="ibm-granite/granite-speech-5.0-470m-turboctc",
+            description=(
+                "Multilingual (English, French, German, Spanish, Portuguese, Italian and "
+                "Japanese), detected automatically. The fastest model, with slightly lower "
+                "English accuracy than Parakeet v2."
+            ),
+            model_type="turboctc",
+            precisions=["bfloat16", "float32"],
+            vram={"bfloat16": "~1.5 GB", "float32": "~2.5 GB"},
         ),
     ]
 
@@ -64,13 +107,30 @@ class ModelMetadata:
         info = cls._MODEL_MAP.get(name)
         return info.model_type if info else "parakeet"
 
+    @staticmethod
+    def get_family_for_type(model_type: str) -> ModelFamily:
+        return FAMILIES.get(model_type, FAMILIES["parakeet"])
+
+    @classmethod
+    def get_family(cls, name: str) -> ModelFamily:
+        return cls.get_family_for_type(cls.get_model_type(name))
+
     @classmethod
     def supports_timestamps(cls, name: str) -> bool:
-        return cls.get_model_type(name) != "canary"
+        return cls.get_family(name).supports_timestamps
+
+    @classmethod
+    def is_cpu_allowed(cls, name: str) -> bool:
+        return cls.get_family(name).cpu_allowed
 
     @classmethod
     def get_chunk_length(cls, name: str) -> int:
-        return CANARY_CHUNK_LENGTH if cls.get_model_type(name) == "canary" else PARAKEET_CHUNK_LENGTH
+        return cls.get_family(name).chunk_length
+
+    @classmethod
+    def effective_chunk_length(cls, model_type: str, configured: int) -> int:
+        family = cls.get_family_for_type(model_type)
+        return int(configured) if family.configurable_chunk_length else family.chunk_length
 
     @classmethod
     def get_description(cls, name: str) -> str:
@@ -89,6 +149,8 @@ class ModelMetadata:
         options = [p for p in info.precisions if p in hw_supported]
 
         if device == "cpu":
+            if not cls.is_cpu_allowed(model_name):
+                return []
             options = [opt for opt in options if opt == "float32"]
 
         return options
@@ -105,15 +167,10 @@ class ModelMetadata:
                     "precision": prec,
                     "model_type": m.model_type,
                     "default_segment_length": cls.get_chunk_length(m.name),
-                    "avg_vram_usage": cls._vram_estimate(m.model_type, prec),
+                    "avg_vram_usage": m.vram.get(prec, ""),
+                    "supports_timestamps": cls.supports_timestamps(m.name),
                 }
         return result
-
-    @staticmethod
-    def _vram_estimate(model_type: str, precision: str) -> str:
-        if model_type == "canary":
-            return "~5.9 GB" if precision in ("bfloat16", "float16") else "~18 GB"
-        return "~1.5 GB" if precision in ("bfloat16", "float16") else "~2.5 GB"
 
     @classmethod
     def resolve_model_key(cls, name: str, precision: str) -> str | None:

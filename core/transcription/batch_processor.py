@@ -8,11 +8,8 @@ from PySide6.QtCore import QThread, Signal, QElapsedTimer
 from core.audio.audio_loader import load_audio_for_parakeet, PARAKEET_SAMPLE_RATE
 from core.output.writers import SegmentData, TranscriptionResult, write_output
 from core.text.curation import curate_text
-from core.transcription.parakeet_core import (
-    transcribe_canary,
-    transcribe_text,
-    transcribe_with_timestamps,
-)
+from core.models.metadata import ModelMetadata
+from core.transcription.dispatch import transcribe_audio
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -88,7 +85,7 @@ class BatchProcessor(QThread):
         seen_paths: set[str] = set()
 
         include_timestamps = self.include_timestamps
-        if self.model_type == "canary":
+        if not ModelMetadata.get_family_for_type(self.model_type).supports_timestamps:
             include_timestamps = False
         elif self.output_format in ("srt", "vtt"):
             include_timestamps = True
@@ -115,48 +112,22 @@ class BatchProcessor(QThread):
                             self._emit(idx, total_files,
                                        f"Processing {audio_file.name} ({pct}%)")
 
-                    segment_data_list: list[SegmentData] = []
-                    if self.model_type == "canary":
-                        text = transcribe_canary(
-                            self.model, audio,
-                            segment_length=self.segment_length,
-                            cancel_check=_cancel_check,
-                            progress_callback=_progress,
-                        )
-                        if self.stop_requested.is_set():
-                            break
-                        if self.curate_enabled:
-                            try:
-                                text = curate_text(text)
-                            except Exception as e:
-                                logger.warning(f"Text curation failed for {audio_file.name}: {e}")
-                    elif include_timestamps:
-                        ts_segments = transcribe_with_timestamps(
-                            self.model, audio,
-                            segment_length=self.segment_length,
-                            segment_duration=self.segment_duration,
-                            cancel_check=_cancel_check,
-                            progress_callback=_progress,
-                        )
-                        if self.stop_requested.is_set():
-                            break
-                        for s, e, t in ts_segments:
-                            segment_data_list.append(SegmentData(start=s, end=e, text=t))
-                        text = " ".join(t for _, _, t in ts_segments)
-                    else:
-                        text = transcribe_text(
-                            self.model, audio,
-                            segment_length=self.segment_length,
-                            cancel_check=_cancel_check,
-                            progress_callback=_progress,
-                        )
-                        if self.stop_requested.is_set():
-                            break
-                        if self.curate_enabled:
-                            try:
-                                text = curate_text(text)
-                            except Exception as e:
-                                logger.warning(f"Text curation failed for {audio_file.name}: {e}")
+                    text, ts_segments = transcribe_audio(
+                        self.model, self.model_type, audio,
+                        segment_length=self.segment_length,
+                        segment_duration=self.segment_duration,
+                        include_timestamps=include_timestamps,
+                        cancel_check=_cancel_check,
+                        progress_callback=_progress,
+                    )
+                    if self.stop_requested.is_set():
+                        break
+                    segment_data_list = [SegmentData(start=s, end=e, text=t) for s, e, t in ts_segments]
+                    if not ts_segments and self.curate_enabled:
+                        try:
+                            text = curate_text(text)
+                        except Exception as e:
+                            logger.warning(f"Text curation failed for {audio_file.name}: {e}")
 
                     result = TranscriptionResult(
                         text=text,

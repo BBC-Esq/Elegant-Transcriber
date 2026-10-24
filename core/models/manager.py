@@ -22,7 +22,7 @@ class _NullWriter:
 from core.logging_config import get_logger
 from core.exceptions import ModelLoadError
 from core.models.metadata import ModelMetadata
-from download_model import find_local_model, get_local_model_path, is_snapshot_complete, MODELS
+from download_model import find_local_model, get_local_model_path, is_snapshot_complete, MODELS, REVISIONS
 
 logger = get_logger(__name__)
 
@@ -51,17 +51,16 @@ def _resolve_torch_dtype(device: str, precision: str):
     return TORCH_DTYPE_MAP.get(precision, torch.float32)
 
 
-def _get_remote_nemo_size(model_id: str) -> int:
+def _get_remote_download_size(model_id: str) -> int:
     filename = MODELS.get(model_id)
-    if not filename:
-        return 0
     try:
         from huggingface_hub import HfApi
         api = HfApi()
-        info = api.repo_info(model_id, repo_type="model", files_metadata=True)
-        for sibling in info.siblings:
-            if sibling.rfilename == filename:
-                return int(sibling.size or 0)
+        info = api.repo_info(
+            model_id, repo_type="model", revision=REVISIONS.get(model_id), files_metadata=True
+        )
+        sizes = {sibling.rfilename: int(sibling.size or 0) for sibling in info.siblings}
+        return sizes.get(filename, 0) if filename else sum(sizes.values())
     except Exception as e:
         logger.debug(f"Could not get remote size for {model_id}: {e}")
     return 0
@@ -132,6 +131,32 @@ def _load_canary_model(local_path: str, device: str, torch_dtype) -> object:
     return model
 
 
+def _load_turboctc_model(local_path: str, device: str, torch_dtype) -> object:
+    logger.info("Importing transformers for Granite Speech TurboCTC...")
+    from transformers import AutoModelForCTC, AutoProcessor
+    from core.transcription.turboctc_core import TurboCTCModel
+
+    logger.info(f"Loading TurboCTC from: {local_path}")
+    model = AutoModelForCTC.from_pretrained(local_path, dtype=torch_dtype)
+    model = model.to(device)
+    model.eval()
+    processor = AutoProcessor.from_pretrained(local_path)
+
+    logger.info(f"Granite Speech TurboCTC model loaded successfully on {device}")
+    return TurboCTCModel(model, processor, device, torch_dtype)
+
+
+_MODEL_LOADERS = {
+    "parakeet": _load_parakeet_model,
+    "canary": _load_canary_model,
+    "turboctc": _load_turboctc_model,
+}
+
+
+def _load_model(model_type: str, local_path: str, device: str, torch_dtype) -> object:
+    return _MODEL_LOADERS.get(model_type, _load_parakeet_model)(local_path, device, torch_dtype)
+
+
 def _download_model_sync(model_id: str) -> str:
     from huggingface_hub import hf_hub_download, snapshot_download
 
@@ -140,16 +165,17 @@ def _download_model_sync(model_id: str) -> str:
     if local_path is None:
         raise ModelLoadError(f"Unknown model_id '{model_id}'")
 
+    revision = REVISIONS.get(model_id)
     if filename:
         local_dir = local_path.parent
         local_dir.mkdir(parents=True, exist_ok=True)
-        hf_hub_download(repo_id=model_id, filename=filename, local_dir=str(local_dir))
+        hf_hub_download(repo_id=model_id, filename=filename, local_dir=str(local_dir), revision=revision)
         if not local_path.is_file():
             raise ModelLoadError(f"Download completed but file not found at {local_path}")
         return str(local_path)
 
     local_path.mkdir(parents=True, exist_ok=True)
-    snapshot_download(repo_id=model_id, local_dir=str(local_path))
+    snapshot_download(repo_id=model_id, local_dir=str(local_path), revision=revision)
     if not is_snapshot_complete(model_id, local_path):
         raise ModelLoadError(f"Download completed but required files are missing at {local_path}")
     return str(local_path)
@@ -201,7 +227,7 @@ class _ModelLoaderThread(QThread):
 
             if local_path is None:
                 try:
-                    total_bytes = _get_remote_nemo_size(model_id) if MODELS.get(model_id) else 0
+                    total_bytes = _get_remote_download_size(model_id)
                 except Exception:
                     total_bytes = 0
 
@@ -237,10 +263,7 @@ class _ModelLoaderThread(QThread):
             self.signals.loading_started.emit(self.model_name, self.model_version)
 
             torch_dtype = _resolve_torch_dtype(self.device, self.precision)
-            if model_type == "canary":
-                model = self._load_canary(local_path, self.device, torch_dtype)
-            else:
-                model = self._load_parakeet(local_path, self.device, torch_dtype)
+            model = _load_model(model_type, local_path, self.device, torch_dtype)
 
             if self._cancelled():
                 self.signals.download_cancelled.emit(self.model_version)
@@ -268,13 +291,12 @@ class _ModelLoaderThread(QThread):
 
         filename = MODELS[model_id]
         local_path = get_local_model_path(model_id)
+        revision = REVISIONS.get(model_id)
 
-        total_bytes = 0
-        if filename:
-            try:
-                total_bytes = _get_remote_nemo_size(model_id)
-            except Exception:
-                pass
+        try:
+            total_bytes = _get_remote_download_size(model_id)
+        except Exception:
+            total_bytes = 0
 
         progress_signal = self.signals.download_progress
         version = self.model_version
@@ -289,7 +311,9 @@ class _ModelLoaderThread(QThread):
                 if cancel_event.is_set():
                     raise InterruptedError("Download cancelled")
                 super().update(n)
-                total = self.total or total_bytes or 0
+                if self.unit != "B":
+                    return
+                total = total_bytes or self.total or 0
                 progress_signal.emit(int(self.n), int(total), version)
 
         if filename:
@@ -300,6 +324,7 @@ class _ModelLoaderThread(QThread):
                     repo_id=model_id,
                     filename=filename,
                     local_dir=str(local_dir),
+                    revision=revision,
                     tqdm_class=_ProgressTqdm,
                 )
             except InterruptedError:
@@ -309,6 +334,7 @@ class _ModelLoaderThread(QThread):
                     repo_id=model_id,
                     filename=filename,
                     local_dir=str(local_dir),
+                    revision=revision,
                 )
                 if total_bytes:
                     progress_signal.emit(total_bytes, total_bytes, version)
@@ -324,6 +350,7 @@ class _ModelLoaderThread(QThread):
             snapshot_download(
                 repo_id=model_id,
                 local_dir=str(local_path),
+                revision=revision,
                 tqdm_class=_ProgressTqdm,
             )
         except InterruptedError:
@@ -332,6 +359,7 @@ class _ModelLoaderThread(QThread):
             snapshot_download(
                 repo_id=model_id,
                 local_dir=str(local_path),
+                revision=revision,
             )
 
         if not is_snapshot_complete(model_id, local_path):
@@ -339,12 +367,6 @@ class _ModelLoaderThread(QThread):
                 f"Download completed but required files are missing at {local_path}"
             )
         return str(local_path)
-
-    def _load_parakeet(self, local_path: str, device: str, torch_dtype) -> object:
-        return _load_parakeet_model(local_path, device, torch_dtype)
-
-    def _load_canary(self, local_path: str, device: str, torch_dtype) -> object:
-        return _load_canary_model(local_path, device, torch_dtype)
 
 
 def _release_gpu_memory() -> None:
@@ -448,10 +470,7 @@ class ModelManager(QObject):
                 local_path = _download_model_sync(model_id)
 
             torch_dtype = _resolve_torch_dtype(device, precision)
-            if model_type == "canary":
-                new_model = _load_canary_model(local_path, device, torch_dtype)
-            else:
-                new_model = _load_parakeet_model(local_path, device, torch_dtype)
+            new_model = _load_model(model_type, local_path, device, torch_dtype)
 
             if cancel_event is not None and cancel_event.is_set():
                 del new_model

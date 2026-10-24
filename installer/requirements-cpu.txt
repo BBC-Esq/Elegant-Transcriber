@@ -1,5 +1,5 @@
 # Elegant Transcriber - CPU Requirements
-# Note: PyTorch is installed separately via wheel URL in setup-app.ps1
+# Note: PyTorch and torchaudio are installed separately via wheel URLs in setup-app.ps1
 #
 # Versions are pinned to the set this app is developed and tested against, so a
 # fresh install reproduces that environment instead of whatever PyPI serves that

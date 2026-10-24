@@ -88,5 +88,5 @@ python main.py
 
 ## Special Thanks
 * Nvidia for the Parkeet models, which are hands down the best balance of accuracy and compute time for most people IMHO.
-* IBM for Granite Speech Models, which, as of March, 2026, rank #1 on the ASR leaderboard in terms of accuracy.  I'll include them in a later release.
+* IBM for Granite Speech Models, which, as of March, 2026, rank #1 on the ASR leaderboard in terms of accuracy.  Granite Speech 5.0 470M TurboCTC is now included, and it's the fastest model in the program.
 * OpenAI for the older Whisper models setting the gold standard for so many years.

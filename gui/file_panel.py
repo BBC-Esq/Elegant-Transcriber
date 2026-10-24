@@ -12,10 +12,10 @@ from PySide6.QtGui import QMoveEvent, QPainter, QColor, QStandardItemModel
 from PySide6.QtCore import QSize as _QSize
 
 
-_CANARY_NO_TIMESTAMPS_TIP = (
-    "<qt>Canary does not support timestamps.<br>"
-    "SRT/VTT require timestamps, so they<br>"
-    "are disabled while Canary is loaded.</qt>"
+_NO_TIMESTAMPS_TIP = (
+    "<qt>The loaded model does not support<br>"
+    "timestamps. SRT/VTT require timestamps,<br>"
+    "so they are disabled while it is loaded.</qt>"
 )
 _TIMESTAMP_FORMATS = {"srt", "vtt"}
 
@@ -352,7 +352,7 @@ class FilePanelWindow(QWidget):
                     item.setToolTip("")
                 else:
                     item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
-                    item.setToolTip(_CANARY_NO_TIMESTAMPS_TIP)
+                    item.setToolTip(_NO_TIMESTAMPS_TIP)
 
         if not supported and self._format_combo.currentText() in _TIMESTAMP_FORMATS:
             txt_idx = self._format_combo.findText("txt")

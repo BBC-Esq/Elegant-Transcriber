@@ -181,8 +181,7 @@ class TranscriberController(QObject):
 
         current_model_name = config_manager.get_value("model_name", "Parakeet TDT 0.6B v2")
         model_type = ModelMetadata.get_model_type(current_model_name)
-        effective_segment_length = ModelMetadata.get_chunk_length(current_model_name) \
-            if model_type == "canary" else segment_length
+        effective_segment_length = ModelMetadata.effective_chunk_length(model_type, segment_length)
 
         self._batch_processor = BatchProcessor(
             files=files,

@@ -29,8 +29,8 @@ from core.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-_CHUNK_TIP_PARAKEET = (
-    "<qt>Fixed at 90 seconds - optimal setting<br>"
+_CHUNK_TIP_BENCHMARKED = (
+    "<qt>Fixed at {seconds} seconds - optimal setting<br>"
     "after extensive benchmarking.</qt>"
 )
 _CHUNK_TIP_CANARY = (
@@ -38,6 +38,7 @@ _CHUNK_TIP_CANARY = (
     "Canary's attention context is capped<br>"
     "lower than Parakeet's.</qt>"
 )
+_CHUNK_TIPS = {"canary": _CHUNK_TIP_CANARY}
 _SEG_DUR_TIP_DEFAULT = (
     "<qt>When timestamps are enabled, word-level<br>"
     "timings are grouped into segments with a<br>"
@@ -50,10 +51,10 @@ _TIMESTAMPS_TIP_DEFAULT = (
     "<qt>Include word-level segment timestamps<br>"
     "in output (auto-enabled for SRT/VTT).</qt>"
 )
-_CANARY_NO_TIMESTAMPS_TIP = (
-    "<qt>Canary does not support timestamps.<br>"
-    "Switch to a Parakeet model to enable<br>"
-    "timestamped output.</qt>"
+_NO_TIMESTAMPS_TIP = (
+    "<qt>{model} does not support timestamps.<br>"
+    "Switch to a Parakeet or Granite model<br>"
+    "to enable timestamped output.</qt>"
 )
 _CANARY_CPU_DISABLED_TIP = (
     "<qt>Canary is heavy (~6 GB VRAM,<br>"
@@ -61,6 +62,11 @@ _CANARY_CPU_DISABLED_TIP = (
     "disabled on CPU. Switch to CUDA to<br>"
     "use this model.</qt>"
 )
+_CPU_DISABLED_TIP_DEFAULT = (
+    "<qt>This model is disabled on CPU.<br>"
+    "Switch to CUDA to use it.</qt>"
+)
+_CPU_DISABLED_TIPS = {"canary": _CANARY_CPU_DISABLED_TIP}
 _FILE_TYPES_TIP = "Configure which audio/video file types to include in batch processing"
 
 
@@ -104,11 +110,7 @@ class SettingsDialog(QDialog):
         }
         self._is_busy_check = is_busy_check or (lambda: False)
         self._server_busy_check = server_busy_check or (lambda: False)
-        self._last_model_type = ModelMetadata.get_model_type(
-            self.current_settings.get("model_name", "Parakeet TDT 0.6B v2")
-        )
-        self._forced_precision: str | None = None
-        self._precision_before_canary: str | None = None
+        self._precision_pref = self.current_settings.get("precision", "bfloat16")
         self._timestamps_pref = bool(self.current_parakeet_settings.get("include_timestamps", False))
         self._ext_checked = current_ext_checked or {
             ext: True for ext in SUPPORTED_AUDIO_EXTENSIONS
@@ -282,6 +284,7 @@ class SettingsDialog(QDialog):
     def _setup_connections(self) -> None:
         self.model_dropdown.currentTextChanged.connect(self._on_model_changed)
         self.device_dropdown.currentTextChanged.connect(self._on_device_changed)
+        self.precision_dropdown.currentTextChanged.connect(self._on_precision_changed)
         self.precision_dropdown.currentTextChanged.connect(self._check_for_changes)
         self.audio_device_dropdown.currentIndexChanged.connect(self._check_for_changes)
         self.include_timestamps_cb.toggled.connect(self._on_timestamps_toggled)
@@ -348,15 +351,11 @@ class SettingsDialog(QDialog):
     def _on_timestamps_toggled(self, checked: bool) -> None:
         self._timestamps_pref = checked
 
+    def _on_precision_changed(self, precision: str) -> None:
+        if precision:
+            self._precision_pref = precision
+
     def _on_model_changed(self, *args) -> None:
-        new_type = ModelMetadata.get_model_type(self.model_dropdown.currentText())
-        if new_type == "canary" and self._last_model_type != "canary":
-            self._precision_before_canary = self.precision_dropdown.currentText()
-            self._forced_precision = "float16"
-        elif (new_type != "canary" and self._last_model_type == "canary"
-                and self._precision_before_canary):
-            self._forced_precision = self._precision_before_canary
-        self._last_model_type = new_type
         self._update_precision_options()
         self._update_model_description()
         self._update_model_dependent_widgets()
@@ -373,23 +372,24 @@ class SettingsDialog(QDialog):
         if not isinstance(model, QStandardItemModel):
             return
 
-        canary_disabled_on_cpu = (device == "cpu")
+        on_cpu = (device == "cpu")
         for i in range(self.model_dropdown.count()):
             item = model.item(i)
             if item is None:
                 continue
             name = item.text()
-            is_canary = ModelMetadata.get_model_type(name) == "canary"
-            if is_canary and canary_disabled_on_cpu:
+            if on_cpu and not ModelMetadata.is_cpu_allowed(name):
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
-                item.setToolTip(_CANARY_CPU_DISABLED_TIP)
+                item.setToolTip(_CPU_DISABLED_TIPS.get(
+                    ModelMetadata.get_model_type(name), _CPU_DISABLED_TIP_DEFAULT
+                ))
             else:
                 item.setFlags(item.flags() | Qt.ItemIsEnabled)
                 item.setToolTip("")
 
-        if canary_disabled_on_cpu:
+        if on_cpu:
             current_name = self.model_dropdown.currentText()
-            if ModelMetadata.get_model_type(current_name) == "canary":
+            if not ModelMetadata.is_cpu_allowed(current_name):
                 for i in range(self.model_dropdown.count()):
                     item = model.item(i)
                     if item and (item.flags() & Qt.ItemIsEnabled):
@@ -406,14 +406,10 @@ class SettingsDialog(QDialog):
         opts = ModelMetadata.get_precision_options(model, device, self.supported_precisions)
 
         self.precision_dropdown.blockSignals(True)
-        current = self.precision_dropdown.currentText()
         self.precision_dropdown.clear()
         self.precision_dropdown.addItems(opts)
-        if self._forced_precision and self._forced_precision in opts:
-            self.precision_dropdown.setCurrentText(self._forced_precision)
-            self._forced_precision = None
-        elif current in opts:
-            self.precision_dropdown.setCurrentText(current)
+        if self._precision_pref in opts:
+            self.precision_dropdown.setCurrentText(self._precision_pref)
         elif opts:
             self.precision_dropdown.setCurrentText(opts[0])
         self.precision_dropdown.blockSignals(False)
@@ -424,24 +420,26 @@ class SettingsDialog(QDialog):
 
     def _update_model_dependent_widgets(self) -> None:
         name = self.model_dropdown.currentText()
-        is_canary = ModelMetadata.get_model_type(name) == "canary"
         chunk_len = ModelMetadata.get_chunk_length(name)
 
         self.chunk_length_label.setText(f"{chunk_len} seconds")
-        chunk_tip = _CHUNK_TIP_CANARY if is_canary else _CHUNK_TIP_PARAKEET
+        chunk_tip = _CHUNK_TIPS.get(
+            ModelMetadata.get_model_type(name), _CHUNK_TIP_BENCHMARKED.format(seconds=chunk_len)
+        )
         self.chunk_length_label.setToolTip(chunk_tip)
         self._chunk_caption.setToolTip(chunk_tip)
 
-        if is_canary:
+        if not ModelMetadata.supports_timestamps(name):
+            no_ts_tip = _NO_TIMESTAMPS_TIP.format(model=name)
             self.include_timestamps_cb.blockSignals(True)
             self.include_timestamps_cb.setChecked(False)
             self.include_timestamps_cb.blockSignals(False)
             self.include_timestamps_cb.setEnabled(False)
-            self.include_timestamps_cb.setToolTip(_CANARY_NO_TIMESTAMPS_TIP)
-            self._timestamps_caption.setToolTip(_CANARY_NO_TIMESTAMPS_TIP)
+            self.include_timestamps_cb.setToolTip(no_ts_tip)
+            self._timestamps_caption.setToolTip(no_ts_tip)
             self.segment_duration_spin.setEnabled(False)
-            self.segment_duration_spin.setToolTip(_CANARY_NO_TIMESTAMPS_TIP)
-            self._seg_dur_caption.setToolTip(_CANARY_NO_TIMESTAMPS_TIP)
+            self.segment_duration_spin.setToolTip(no_ts_tip)
+            self._seg_dur_caption.setToolTip(no_ts_tip)
         else:
             self.include_timestamps_cb.blockSignals(True)
             self.include_timestamps_cb.setChecked(self._timestamps_pref)
@@ -455,7 +453,7 @@ class SettingsDialog(QDialog):
 
     def _update_segment_duration_enabled(self) -> None:
         name = self.model_dropdown.currentText()
-        if ModelMetadata.get_model_type(name) == "canary":
+        if not ModelMetadata.supports_timestamps(name):
             self.segment_duration_spin.setEnabled(False)
             return
         self.segment_duration_spin.setEnabled(self.include_timestamps_cb.isChecked())

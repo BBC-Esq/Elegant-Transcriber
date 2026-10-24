@@ -11,10 +11,19 @@ MODELS = {
     "nvidia/parakeet-tdt-0.6b-v2": "parakeet-tdt-0.6b-v2.nemo",
     "nvidia/parakeet-tdt-0.6b-v3": "parakeet-tdt-0.6b-v3.nemo",
     "nvidia/canary-qwen-2.5b": None,
+    "ibm-granite/granite-speech-5.0-470m-turboctc": None,
 }
 
 SNAPSHOT_REQUIRED_FILES = {
     "nvidia/canary-qwen-2.5b": ("config.json", "model.safetensors"),
+    "ibm-granite/granite-speech-5.0-470m-turboctc": (
+        "config.json", "generation_config.json", "model.safetensors",
+        "processor_config.json", "tokenizer.json", "tokenizer_config.json",
+    ),
+}
+
+REVISIONS = {
+    "ibm-granite/granite-speech-5.0-470m-turboctc": "1dd23f46f6d4e6eae2531982ba2e33220086dd97",
 }
 
 
@@ -72,6 +81,7 @@ def download_model(repo_id: str) -> str:
             repo_id=repo_id,
             filename=filename,
             local_dir=str(local_dir),
+            revision=REVISIONS.get(repo_id),
         )
 
         if local_path.is_file():
@@ -90,6 +100,7 @@ def download_model(repo_id: str) -> str:
     snapshot_download(
         repo_id=repo_id,
         local_dir=str(local_path),
+        revision=REVISIONS.get(repo_id),
     )
 
     if is_snapshot_complete(repo_id, local_path):

@@ -22,24 +22,18 @@ from pydantic import BaseModel
 
 from config.server_settings import TranscriptionSettings
 from core.models.metadata import ModelMetadata
-from core.transcription.parakeet_core import (
-    CANARY_OVERLAP_SECONDS,
-    transcribe_canary,
-    transcribe_text,
-    transcribe_with_timestamps,
-)
+from core.transcription.dispatch import transcribe_audio
 
 logger = logging.getLogger(__name__)
 
 SR = 16000
-CANARY_MAX_CHUNK_LENGTH = 40
 
-# Valid segment_length range, matching the GUI/config validator. Client-supplied
-# values arrive over HTTP without the config-layer clamp, so the server must
-# enforce these bounds itself. A segment_length <= CANARY_OVERLAP_SECONDS makes
-# Canary's chunking step zero or negative, which get_chunks rejects.
+# Lower bound for segment_length, matching the GUI/config validator; the upper
+# bound is each model family's own maximum. Client-supplied values arrive over
+# HTTP without the config-layer clamp, so the server must enforce these bounds
+# itself. A segment_length <= CANARY_OVERLAP_SECONDS makes Canary's chunking
+# step zero or negative, which get_chunks rejects.
 MIN_SEGMENT_LENGTH = 10
-MAX_SEGMENT_LENGTH = 100
 
 # Matches the GUI spinbox and the config validator. An unclamped negative
 # value reaches group_words_into_segments as max_duration and degenerates
@@ -203,53 +197,28 @@ class ServerTranscriptionWorker:
         self.cancel_event = cancel_event
 
     def transcribe(self, model, audio: np.ndarray) -> Dict[str, Any]:
-        use_timestamps = (
-            self.settings.word_timestamps and self.model_type != "canary"
+        text, segments = transcribe_audio(
+            model, self.model_type, audio,
+            segment_length=self._segment_length(),
+            segment_duration=self.settings.segment_duration,
+            include_timestamps=bool(self.settings.word_timestamps),
+            cancel_check=self.cancel_event.is_set,
         )
+        return {
+            "text": text,
+            "segments": [
+                {"start": round(s, 3), "end": round(e, 3), "text": t}
+                for s, e, t in segments
+            ],
+        }
 
-        if self.model_type == "canary":
-            text = self._transcribe_canary(model, audio)
-            return {"text": text, "segments": []}
-        elif use_timestamps:
-            segments = self._transcribe_with_timestamps(model, audio)
-            text = " ".join(s[2] for s in segments)
-            return {
-                "text": text,
-                "segments": [
-                    {"start": round(s, 3), "end": round(e, 3), "text": t}
-                    for s, e, t in segments
-                ],
-            }
-        else:
-            text = self._transcribe_text(model, audio)
-            return {"text": text, "segments": []}
-
-    def _canary_segment_length(self) -> int:
-        seg_len = min(self.settings.segment_length, CANARY_MAX_CHUNK_LENGTH)
+    def _segment_length(self) -> int:
+        family = ModelMetadata.get_family_for_type(self.model_type)
+        seg_len = min(self.settings.segment_length, family.max_chunk_length)
         # Defensive floor: keep the chunk step (segment_samples -
         # overlap_samples) positive even if settings were built without
         # _build_settings' clamp.
-        return max(seg_len, CANARY_OVERLAP_SECONDS + 1)
-
-    def _transcribe_text(self, model, audio: np.ndarray) -> str:
-        return transcribe_text(
-            model, audio, self.settings.segment_length,
-            cancel_check=self.cancel_event.is_set,
-        )
-
-    def _transcribe_canary(self, model, audio: np.ndarray) -> str:
-        return transcribe_canary(
-            model, audio, self._canary_segment_length(),
-            cancel_check=self.cancel_event.is_set,
-        )
-
-    def _transcribe_with_timestamps(
-        self, model, audio: np.ndarray
-    ) -> List[Tuple[float, float, str]]:
-        return transcribe_with_timestamps(
-            model, audio, self.settings.segment_length, self.settings.segment_duration,
-            cancel_check=self.cancel_event.is_set,
-        )
+        return max(seg_len, family.min_chunk_length)
 
 
 async def _queue_worker(queue: asyncio.Queue, cancel_event: Event):
@@ -339,8 +308,14 @@ def _build_settings(
 
     model_key, model_info = _resolve_model_key(model_name, precision, device, defaults)
 
-    seg_len = segment_length or defaults.segment_length
-    seg_len = max(MIN_SEGMENT_LENGTH, min(int(seg_len), MAX_SEGMENT_LENGTH))
+    family = ModelMetadata.get_family(model_info["name"])
+    if segment_length:
+        seg_len = int(segment_length)
+    elif family.configurable_chunk_length:
+        seg_len = int(defaults.segment_length)
+    else:
+        seg_len = family.chunk_length
+    seg_len = max(MIN_SEGMENT_LENGTH, min(seg_len, family.max_chunk_length))
 
     seg_dur = segment_duration or defaults.segment_duration
     seg_dur = max(MIN_SEGMENT_DURATION, min(int(seg_dur), MAX_SEGMENT_DURATION))
@@ -402,7 +377,8 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Elegant Transcriber API",
         description=(
-            "Transcribe audio using NVIDIA NeMo models (Parakeet v2/v3, Canary-Qwen). "
+            "Transcribe audio using NVIDIA NeMo models (Parakeet v2/v3, Canary-Qwen) "
+            "and IBM Granite Speech TurboCTC. "
             "Accepts audio files, numpy arrays, PyTorch tensors, raw PCM, "
             "and base64-encoded data."
         ),
@@ -434,7 +410,7 @@ def create_app() -> FastAPI:
                 "model_type": info["model_type"],
                 "avg_vram_usage": info["avg_vram_usage"],
                 "default_segment_length": info["default_segment_length"],
-                "supports_timestamps": info["model_type"] != "canary",
+                "supports_timestamps": info["supports_timestamps"],
             }
         return result
 

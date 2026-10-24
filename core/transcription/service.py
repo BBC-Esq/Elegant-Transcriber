@@ -9,11 +9,7 @@ from core.audio.audio_loader import load_audio_for_parakeet, PARAKEET_SAMPLE_RAT
 from core.temp_file_manager import temp_file_manager
 from core.text.curation import curate_text
 from core.output.writers import SegmentData, TranscriptionResult
-from core.transcription.parakeet_core import (
-    transcribe_canary,
-    transcribe_text,
-    transcribe_with_timestamps,
-)
+from core.transcription.dispatch import transcribe_audio
 from core.models.metadata import ModelMetadata
 from core.logging_config import get_logger
 
@@ -84,41 +80,18 @@ class _TranscriptionRunnable(QRunnable):
                     pct = min(100.0, ((chunk_idx + 1) / total_chunks) * 100.0)
                     self.signals.progress_updated.emit(chunk_idx + 1, total_chunks, pct)
 
-            segment_data_list: list[SegmentData] = []
-            if self.model_type == "canary":
-                text = transcribe_canary(
-                    self.model, audio,
-                    segment_length=self.segment_length,
-                    cancel_check=_cancel_check,
-                    progress_callback=_progress,
-                )
-                if self._is_cancelled():
-                    self.signals.cancelled.emit()
-                    return
-            elif self.include_timestamps:
-                ts_segments = transcribe_with_timestamps(
-                    self.model, audio,
-                    segment_length=self.segment_length,
-                    segment_duration=self.segment_duration,
-                    cancel_check=_cancel_check,
-                    progress_callback=_progress,
-                )
-                if self._is_cancelled():
-                    self.signals.cancelled.emit()
-                    return
-                for s, e, t in ts_segments:
-                    segment_data_list.append(SegmentData(start=s, end=e, text=t))
-                text = " ".join(t for _, _, t in ts_segments)
-            else:
-                text = transcribe_text(
-                    self.model, audio,
-                    segment_length=self.segment_length,
-                    cancel_check=_cancel_check,
-                    progress_callback=_progress,
-                )
-                if self._is_cancelled():
-                    self.signals.cancelled.emit()
-                    return
+            text, ts_segments = transcribe_audio(
+                self.model, self.model_type, audio,
+                segment_length=self.segment_length,
+                segment_duration=self.segment_duration,
+                include_timestamps=self.include_timestamps,
+                cancel_check=_cancel_check,
+                progress_callback=_progress,
+            )
+            if self._is_cancelled():
+                self.signals.cancelled.emit()
+                return
+            segment_data_list = [SegmentData(start=s, end=e, text=t) for s, e, t in ts_segments]
 
             logger.info(f"Transcription completed ({len(segment_data_list)} segments, {len(text)} chars)")
 
@@ -216,9 +189,9 @@ class TranscriptionService(QObject):
             if include_timestamps is None:
                 include_timestamps = self._include_timestamps
 
-            effective_segment_length = self._segment_length
-            if self._model_type == "canary":
-                effective_segment_length = ModelMetadata.get_chunk_length("Canary-Qwen 2.5B")
+            effective_segment_length = ModelMetadata.effective_chunk_length(
+                self._model_type, self._segment_length
+            )
 
             runnable = _TranscriptionRunnable(
                 model=model,

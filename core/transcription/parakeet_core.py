@@ -122,12 +122,13 @@ def _transcribe_chunk_words(model, chunk_audio: np.ndarray, time_offset: float) 
     return words
 
 
-def _transcribe_words(
+def transcribe_words(
     model,
     audio: np.ndarray,
     segment_length: float,
     cancel_check=None,
     progress_callback=None,
+    transcribe_chunk=_transcribe_chunk_words,
 ) -> List[Tuple[float, float, str]]:
     chunks = get_chunks(audio, segment_length, parakeet_overlap_seconds(segment_length))
     chunk_words = []
@@ -137,7 +138,7 @@ def _transcribe_words(
             break
         if progress_callback:
             progress_callback(i, len(chunks))
-        chunk_words.append(_transcribe_chunk_words(model, chunk_audio, time_offset))
+        chunk_words.append(transcribe_chunk(model, chunk_audio, time_offset))
         chunk_spans.append((time_offset, time_offset + len(chunk_audio) / SR))
     return stitch_words_at_midpoints(chunk_words, chunk_spans)
 
@@ -150,7 +151,7 @@ def transcribe_text(
     progress_callback=None,
 ) -> str:
     if len(audio) > int(segment_length * SR):
-        words = _transcribe_words(model, audio, segment_length, cancel_check, progress_callback)
+        words = transcribe_words(model, audio, segment_length, cancel_check, progress_callback)
         return " ".join(w[2] for w in words)
     if cancel_check and cancel_check():
         return ""
@@ -215,7 +216,7 @@ def transcribe_with_timestamps(
     cancel_check=None,
     progress_callback=None,
 ) -> List[Tuple[float, float, str]]:
-    words = _transcribe_words(model, audio, segment_length, cancel_check, progress_callback)
+    words = transcribe_words(model, audio, segment_length, cancel_check, progress_callback)
     if words:
         return group_words_into_segments(words, max_duration=float(segment_duration))
     return []

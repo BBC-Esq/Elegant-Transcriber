@@ -511,12 +511,12 @@ response <span class="op">=</span> requests.<span class="fn">post</span>(
     <tr><th>Parameter</th><th>Type</th><th>Description</th><th>Values</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>model</code></td><td>string</td><td>Which model to use</td><td><code>"Parakeet TDT 0.6B v2"</code>, <code>"Parakeet TDT 0.6B v3"</code>, <code>"Canary-Qwen 2.5B"</code></td></tr>
-    <tr><td><code>precision</code></td><td>string</td><td>Numerical precision (Parakeet supports all three; Canary supports <code>bfloat16</code> and <code>float16</code> only)</td><td><code>"bfloat16"</code>, <code>"float16"</code>, <code>"float32"</code></td></tr>
+    <tr><td><code>model</code></td><td>string</td><td>Which model to use</td><td><code>"Parakeet TDT 0.6B v2"</code>, <code>"Parakeet TDT 0.6B v3"</code>, <code>"Canary-Qwen 2.5B"</code>, <code>"Granite Speech 5.0 470M TurboCTC"</code></td></tr>
+    <tr><td><code>precision</code></td><td>string</td><td>Numerical precision (Parakeet supports all three; Canary supports <code>bfloat16</code> and <code>float16</code> only; Granite TurboCTC supports <code>bfloat16</code> and <code>float32</code> only)</td><td><code>"bfloat16"</code>, <code>"float16"</code>, <code>"float32"</code></td></tr>
     <tr><td><code>device</code></td><td>string</td><td>CPU or GPU</td><td><code>"cuda"</code>, <code>"cpu"</code></td></tr>
     <tr><td><code>output_format</code></td><td>string</td><td>Timestamp output format</td><td><code>"txt"</code>, <code>"srt"</code>, <code>"vtt"</code>, <code>"json"</code></td></tr>
     <tr><td><code>word_timestamps</code></td><td>boolean</td><td>Enable word-level timestamps</td><td><code>"true"</code>, <code>"false"</code></td></tr>
-    <tr><td><code>segment_length</code></td><td>integer</td><td>Audio chunk size in seconds</td><td>e.g. <code>"30"</code>, <code>"60"</code>, <code>"80"</code></td></tr>
+    <tr><td><code>segment_length</code></td><td>integer</td><td>Audio chunk size in seconds. If omitted, Parakeet uses the GUI setting, Canary uses 40 (its maximum) and Granite TurboCTC uses 45.</td><td>e.g. <code>"30"</code>, <code>"60"</code>, <code>"80"</code></td></tr>
     <tr><td><code>segment_duration</code></td><td>integer</td><td>Timestamp grouping interval in seconds</td><td>e.g. <code>"5"</code>, <code>"10"</code>, <code>"15"</code></td></tr>
     <tr><td><code>audio_format</code></td><td>string</td><td>Override input format auto-detection</td><td><code>"auto"</code>, <code>"file"</code>, <code>"numpy"</code>, <code>"tensor"</code>, <code>"pcm"</code></td></tr>
     <tr><td><code>sample_rate</code></td><td>integer</td><td>Sample rate of raw audio input</td><td>e.g. <code>"16000"</code>, <code>"22050"</code>, <code>"44100"</code>, <code>"48000"</code></td></tr>
@@ -567,7 +567,7 @@ result <span class="op">=</span> response.<span class="fn">json</span>()
 
 <p>When timestamps are off (or the model is Canary-Qwen), <code>segments</code> is always an empty list <code>[]</code>.</p>
 
-<h3>6b. With timestamps <span style="color:var(--text-dim); font-weight:400;">(word_timestamps=true, Parakeet models only)</span></h3>
+<h3>6b. With timestamps <span style="color:var(--text-dim); font-weight:400;">(word_timestamps=true, Parakeet and Granite TurboCTC models)</span></h3>
 
 <pre><code><span class="cmt">// POST /transcribe  &mdash;  word_timestamps=true, segment_duration=10</span>
 {
@@ -695,12 +695,14 @@ the quarterly results and our plans for the upcoming product launch.</span></cod
     <tr><td>Parakeet TDT 0.6B v2</td><td>Yes</td><td>Fast</td><td>High (English)</td><td>~1.5 GB</td></tr>
     <tr><td>Parakeet TDT 0.6B v3</td><td>Yes</td><td>Fast</td><td>Slightly lower English, multilingual</td><td>~1.5 GB</td></tr>
     <tr><td>Canary-Qwen 2.5B</td><td>No</td><td>~30x slower</td><td>Highest (English)</td><td>~6 GB (CUDA only; <code>float32</code> not supported)</td></tr>
+    <tr><td>Granite Speech 5.0 470M TurboCTC</td><td>Yes</td><td>Fastest</td><td>Slightly lower English than Parakeet v2; multilingual (7 languages)</td><td>~1.5 GB (<code>float16</code> not supported)</td></tr>
   </tbody>
 </table>
 
 <div class="callout warn">
   <div class="tag">Important</div>
   <strong>Canary-Qwen</strong> does not support timestamps. If you request <code>word_timestamps=true</code> with Canary, the <code>segments</code> field will be empty and <code>text</code> will still contain the full transcription. Canary also has a hard maximum audio chunk length of 40 seconds (enforced automatically).
+  <br><br><strong>Granite TurboCTC</strong> detects the language by itself (English, French, German, Spanish, Portuguese, Italian or Japanese) and uses 45-second chunks unless you pass <code>segment_length</code>.
 </div>
 </section>
 
@@ -779,7 +781,7 @@ models <span class="op">=</span> r.<span class="fn">json</span>()
         <span class="str">"precision"</span>: <span class="str">"bfloat16"</span>,
         <span class="str">"model_type"</span>: <span class="str">"parakeet"</span>,
         <span class="str">"avg_vram_usage"</span>: <span class="str">"~1.5 GB"</span>,
-        <span class="str">"default_segment_length"</span>: <span class="num">80</span>,
+        <span class="str">"default_segment_length"</span>: <span class="num">90</span>,
         <span class="str">"supports_timestamps"</span>: <span class="kw">true</span>
     },
     <span class="str">"Canary-Qwen 2.5B - bfloat16"</span>: {
@@ -788,7 +790,7 @@ models <span class="op">=</span> r.<span class="fn">json</span>()
         <span class="str">"precision"</span>: <span class="str">"bfloat16"</span>,
         <span class="str">"model_type"</span>: <span class="str">"canary"</span>,
         <span class="str">"avg_vram_usage"</span>: <span class="str">"~5.9 GB"</span>,
-        <span class="str">"default_segment_length"</span>: <span class="num">30</span>,
+        <span class="str">"default_segment_length"</span>: <span class="num">40</span>,
         <span class="str">"supports_timestamps"</span>: <span class="kw">false</span>
     },
     <span class="cmt">// ... more entries for each model + precision combination</span>
@@ -802,7 +804,7 @@ models <span class="op">=</span> r.<span class="fn">json</span>()
     <tr><td><code>name</code></td><td>string</td><td>Short model name (use this as the <code>model</code> parameter).</td></tr>
     <tr><td><code>model_id</code></td><td>string</td><td>HuggingFace model ID.</td></tr>
     <tr><td><code>precision</code></td><td>string</td><td>Numerical precision for this entry.</td></tr>
-    <tr><td><code>model_type</code></td><td>string</td><td><code>"parakeet"</code> or <code>"canary"</code>.</td></tr>
+    <tr><td><code>model_type</code></td><td>string</td><td><code>"parakeet"</code>, <code>"canary"</code> or <code>"turboctc"</code>.</td></tr>
     <tr><td><code>avg_vram_usage</code></td><td>string</td><td>Approximate VRAM needed (human-readable).</td></tr>
     <tr><td><code>default_segment_length</code></td><td>int</td><td>Default audio chunk size in seconds for this model.</td></tr>
     <tr><td><code>supports_timestamps</code></td><td>bool</td><td>Whether this model can produce word-level timestamps.</td></tr>
@@ -1207,12 +1209,12 @@ Every setting is optional. If omitted, the server uses whatever was configured i
 
 | Parameter        | Type    | Description                              | Values                                                          |
 |------------------|---------|------------------------------------------|-----------------------------------------------------------------|
-| model            | string  | Which model to use                       | "Parakeet TDT 0.6B v2", "Parakeet TDT 0.6B v3", "Canary-Qwen 2.5B" |
+| model            | string  | Which model to use                       | "Parakeet TDT 0.6B v2", "Parakeet TDT 0.6B v3", "Canary-Qwen 2.5B", "Granite Speech 5.0 470M TurboCTC" |
 | precision        | string  | Numerical precision                      | "bfloat16", "float16", "float32"                                |
 | device           | string  | CPU or GPU                               | "cuda", "cpu"                                                   |
 | output_format    | string  | Timestamp output format                  | "txt", "srt", "vtt", "json"                                    |
 | word_timestamps  | boolean | Enable word-level timestamps             | "true", "false"                                                 |
-| segment_length   | integer | Audio chunk size in seconds              | e.g. "30", "60", "80"                                          |
+| segment_length   | integer | Audio chunk size in seconds (default: Parakeet uses the GUI setting, Canary 40, Granite TurboCTC 45) | e.g. "30", "60", "80" |
 | segment_duration | integer | Timestamp grouping interval in seconds   | e.g. "5", "10", "15"                                           |
 | audio_format     | string  | Override input format auto-detection     | "auto", "file", "numpy", "tensor", "pcm"                       |
 | sample_rate      | integer | Sample rate of raw audio input           | e.g. "16000", "22050", "44100", "48000"                         |
@@ -1261,7 +1263,7 @@ Every transcription request returns a JSON object with five fields.
 
 When timestamps are off (or the model is Canary-Qwen), segments is always an empty list [].
 
-### 6b. With timestamps (word_timestamps=true, Parakeet models only)
+### 6b. With timestamps (word_timestamps=true, Parakeet and Granite TurboCTC models)
 
 \`\`\`json
 {
@@ -1381,8 +1383,11 @@ Note: The output_format parameter (txt, srt, vtt, json) only affects file output
 | Parakeet TDT 0.6B v2| Yes        | Fast       | High (English)                  | ~1.5 GB  |
 | Parakeet TDT 0.6B v3| Yes        | Fast       | Slightly lower English, multi   | ~1.5 GB  |
 | Canary-Qwen 2.5B    | No         | ~30x slower| Highest (English)               | ~6 GB    |
+| Granite Speech 5.0 470M TurboCTC | Yes | Fastest | Slightly lower English than Parakeet v2, multi (7 languages) | ~1.5 GB |
 
 Important: Canary-Qwen does not support timestamps. If you request word_timestamps=true with Canary, the segments field will be empty and text will still contain the full transcription. Canary also has a hard maximum audio chunk length of 40 seconds (enforced automatically).
+
+Granite TurboCTC detects the language by itself (English, French, German, Spanish, Portuguese, Italian or Japanese) and uses 45-second chunks unless you pass segment_length.
 
 ## 8. Checking Server Status
 
@@ -1461,7 +1466,7 @@ Returns a dictionary keyed by model display name. Each entry looks like:
         "precision": "bfloat16",
         "model_type": "parakeet",
         "avg_vram_usage": "~1.5 GB",
-        "default_segment_length": 80,
+        "default_segment_length": 90,
         "supports_timestamps": true
     },
     "Canary-Qwen 2.5B - bfloat16": {
@@ -1470,7 +1475,7 @@ Returns a dictionary keyed by model display name. Each entry looks like:
         "precision": "bfloat16",
         "model_type": "canary",
         "avg_vram_usage": "~5.9 GB",
-        "default_segment_length": 30,
+        "default_segment_length": 40,
         "supports_timestamps": false
     }
 }
@@ -1481,7 +1486,7 @@ Returns a dictionary keyed by model display name. Each entry looks like:
 | name                   | string | Short model name (use this as the model parameter).            |
 | model_id               | string | HuggingFace model ID.                                          |
 | precision              | string | Numerical precision for this entry.                            |
-| model_type             | string | "parakeet" or "canary".                                        |
+| model_type             | string | "parakeet", "canary" or "turboctc".                            |
 | avg_vram_usage         | string | Approximate VRAM needed (human-readable).                      |
 | default_segment_length | int    | Default audio chunk size in seconds for this model.            |
 | supports_timestamps    | bool   | Whether this model can produce word-level timestamps.          |
