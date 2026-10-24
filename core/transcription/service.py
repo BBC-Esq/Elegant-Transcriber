@@ -35,6 +35,7 @@ class _TranscriptionRunnable(QRunnable):
         segment_duration: int = 10,
         include_timestamps: bool = False,
         model_type: str = "parakeet",
+        language: str = "en",
         get_current_version_func=None,
         cancel_event: threading.Event | None = None,
     ) -> None:
@@ -48,6 +49,7 @@ class _TranscriptionRunnable(QRunnable):
         self.segment_duration = segment_duration
         self.include_timestamps = include_timestamps
         self.model_type = model_type
+        self.language = language
         self.get_current_version = get_current_version_func
         self.cancel_event = cancel_event or threading.Event()
         self.signals = _TranscriberSignals()
@@ -80,11 +82,12 @@ class _TranscriptionRunnable(QRunnable):
                     pct = min(100.0, ((chunk_idx + 1) / total_chunks) * 100.0)
                     self.signals.progress_updated.emit(chunk_idx + 1, total_chunks, pct)
 
-            text, ts_segments = transcribe_audio(
+            text, ts_segments, language = transcribe_audio(
                 self.model, self.model_type, audio,
                 segment_length=self.segment_length,
                 segment_duration=self.segment_duration,
                 include_timestamps=self.include_timestamps,
+                language=self.language,
                 cancel_check=_cancel_check,
                 progress_callback=_progress,
             )
@@ -98,7 +101,7 @@ class _TranscriptionRunnable(QRunnable):
             result = TranscriptionResult(
                 text=text,
                 segments=segment_data_list,
-                language=None,
+                language=language,
                 duration=total_duration,
                 source_file=self.audio_file,
             )
@@ -136,19 +139,22 @@ class TranscriptionService(QObject):
         self._segment_length: int = 90
         self._segment_duration: int = 10
         self._include_timestamps: bool = False
+        self._language: str = "en"
         self._model_type: str = "parakeet"
 
     def set_model_version_provider(self, func) -> None:
         self._get_model_version_func = func
 
-    def set_parakeet_params(self, segment_length: int, segment_duration: int, include_timestamps: bool) -> None:
+    def set_parakeet_params(self, segment_length: int, segment_duration: int, include_timestamps: bool,
+                            language: str = "en") -> None:
         self._segment_length = int(segment_length)
         self._segment_duration = int(segment_duration)
         self._include_timestamps = bool(include_timestamps)
+        self._language = language
         logger.debug(
             f"Parakeet params: segment_length={self._segment_length}s, "
             f"segment_duration={self._segment_duration}s, "
-            f"timestamps={self._include_timestamps}"
+            f"timestamps={self._include_timestamps}, language={self._language}"
         )
 
     def set_model_type(self, model_type: str) -> None:
@@ -202,6 +208,7 @@ class TranscriptionService(QObject):
                 segment_duration=self._segment_duration,
                 include_timestamps=include_timestamps,
                 model_type=self._model_type,
+                language=self._language,
                 get_current_version_func=self._get_model_version_func,
                 cancel_event=self._cancel_event,
             )

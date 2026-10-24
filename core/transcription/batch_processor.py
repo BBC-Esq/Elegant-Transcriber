@@ -59,6 +59,7 @@ class BatchProcessor(QThread):
         include_timestamps: bool,
         model_type: str = "parakeet",
         curate_enabled: bool = False,
+        language: str = "en",
     ):
         super().__init__()
         self.files = files
@@ -70,6 +71,7 @@ class BatchProcessor(QThread):
         self.include_timestamps = bool(include_timestamps)
         self.model_type = model_type or "parakeet"
         self.curate_enabled = bool(curate_enabled)
+        self.language = language
         self.stop_requested = Event()
 
     def request_stop(self) -> None:
@@ -112,11 +114,12 @@ class BatchProcessor(QThread):
                             self._emit(idx, total_files,
                                        f"Processing {audio_file.name} ({pct}%)")
 
-                    text, ts_segments = transcribe_audio(
+                    text, ts_segments, language = transcribe_audio(
                         self.model, self.model_type, audio,
                         segment_length=self.segment_length,
                         segment_duration=self.segment_duration,
                         include_timestamps=include_timestamps,
+                        language=self.language,
                         cancel_check=_cancel_check,
                         progress_callback=_progress,
                     )
@@ -132,7 +135,7 @@ class BatchProcessor(QThread):
                     result = TranscriptionResult(
                         text=text,
                         segments=segment_data_list,
-                        language=None,
+                        language=language,
                         duration=duration,
                         source_file=audio_file,
                     )

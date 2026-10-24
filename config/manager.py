@@ -31,6 +31,7 @@ class ConfigManager:
         "include_timestamps": False,
         "segment_length": 90,
         "segment_duration": 10,
+        "language": "en",
         "output_format": "txt",
         "server_mode_enabled": False,
         "server_port": 8765,
@@ -44,6 +45,7 @@ class ConfigManager:
         "include_timestamps": {"type": bool},
         "segment_length": {"type": int, "validator": "_validate_segment_length"},
         "segment_duration": {"type": int, "validator": "_validate_segment_duration"},
+        "language": {"type": str, "validator": "_validate_language"},
         "output_format": {"type": str, "options": "output_formats"},
         "server_mode_enabled": {"type": bool},
         "server_port": {"type": int, "validator": "_validate_server_port"},
@@ -128,6 +130,10 @@ class ConfigManager:
         if isinstance(value, int) and 1 <= value <= 90:
             return value
         return self.DEFAULT_CONFIG["segment_duration"]
+
+    def _validate_language(self, value: Any) -> str:
+        from core.models.metadata import ModelMetadata
+        return ModelMetadata.resolve_language(value) or self.DEFAULT_CONFIG["language"]
 
     def _validate_server_port(self, value: Any) -> int:
         if isinstance(value, int) and 1024 <= value <= 65535:

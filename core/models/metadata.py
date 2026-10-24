@@ -7,6 +7,42 @@ from typing import Dict, List
 PARAKEET_CHUNK_LENGTH = 90
 CANARY_CHUNK_LENGTH = 40
 TURBOCTC_CHUNK_LENGTH = 45
+QWEN3_CHUNK_LENGTH = 120
+QWEN3_MAX_CHUNK_LENGTH = 1200
+
+LANGUAGE_AUTO = "auto"
+LANGUAGES: Dict[str, str] = {
+    "ar": "Arabic",
+    "yue": "Cantonese",
+    "zh": "Chinese",
+    "cs": "Czech",
+    "da": "Danish",
+    "nl": "Dutch",
+    "en": "English",
+    "fil": "Filipino",
+    "fi": "Finnish",
+    "fr": "French",
+    "de": "German",
+    "el": "Greek",
+    "hi": "Hindi",
+    "hu": "Hungarian",
+    "id": "Indonesian",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "mk": "Macedonian",
+    "ms": "Malay",
+    "fa": "Persian",
+    "pl": "Polish",
+    "pt": "Portuguese",
+    "ro": "Romanian",
+    "ru": "Russian",
+    "es": "Spanish",
+    "sv": "Swedish",
+    "th": "Thai",
+    "tr": "Turkish",
+    "vi": "Vietnamese",
+}
 
 
 @dataclass(frozen=True)
@@ -17,6 +53,7 @@ class ModelFamily:
     supports_timestamps: bool
     cpu_allowed: bool
     configurable_chunk_length: bool = False
+    supports_language: bool = False
 
 
 FAMILIES: Dict[str, ModelFamily] = {
@@ -31,6 +68,10 @@ FAMILIES: Dict[str, ModelFamily] = {
     "turboctc": ModelFamily(
         chunk_length=TURBOCTC_CHUNK_LENGTH, min_chunk_length=10, max_chunk_length=100,
         supports_timestamps=True, cpu_allowed=True,
+    ),
+    "qwen3asr": ModelFamily(
+        chunk_length=QWEN3_CHUNK_LENGTH, min_chunk_length=10, max_chunk_length=QWEN3_MAX_CHUNK_LENGTH,
+        supports_timestamps=False, cpu_allowed=False, supports_language=True,
     ),
 }
 
@@ -85,6 +126,27 @@ class ModelMetadata:
             precisions=["bfloat16", "float32"],
             vram={"bfloat16": "~1.5 GB", "float32": "~2.5 GB"},
         ),
+        ModelInfo(
+            name="Qwen3-ASR 0.6B",
+            model_id="Qwen/Qwen3-ASR-0.6B-hf",
+            description=(
+                "Multilingual (30 languages; choose one under Language or let it detect it). "
+                "More accurate than Canary and a bit faster, but much slower than Parakeet. "
+                "Does not support timestamps."
+            ),
+            model_type="qwen3asr",
+            vram={"bfloat16": "~3.3 GB", "float16": "~3.3 GB", "float32": "~6 GB"},
+        ),
+        ModelInfo(
+            name="Qwen3-ASR 1.7B",
+            model_id="Qwen/Qwen3-ASR-1.7B-hf",
+            description=(
+                "Multilingual (30 languages; choose one under Language or let it detect it). "
+                "The most accurate model, at the same speed as the 0.6B. Does not support timestamps."
+            ),
+            model_type="qwen3asr",
+            vram={"bfloat16": "~6.3 GB", "float16": "~6.3 GB", "float32": "~11 GB"},
+        ),
     ]
 
     _MODEL_MAP: Dict[str, ModelInfo] = OrderedDict((m.name, m) for m in _MODELS)
@@ -122,6 +184,20 @@ class ModelMetadata:
     @classmethod
     def is_cpu_allowed(cls, name: str) -> bool:
         return cls.get_family(name).cpu_allowed
+
+    @classmethod
+    def supports_language(cls, name: str) -> bool:
+        return cls.get_family(name).supports_language
+
+    @staticmethod
+    def resolve_language(value: str | None) -> str | None:
+        key = (value or "").strip().lower()
+        if key == LANGUAGE_AUTO or key in LANGUAGES:
+            return key
+        for code, language in LANGUAGES.items():
+            if language.lower() == key:
+                return code
+        return None
 
     @classmethod
     def get_chunk_length(cls, name: str) -> int:

@@ -146,10 +146,26 @@ def _load_turboctc_model(local_path: str, device: str, torch_dtype) -> object:
     return TurboCTCModel(model, processor, device, torch_dtype)
 
 
+def _load_qwen3asr_model(local_path: str, device: str, torch_dtype) -> object:
+    logger.info("Importing transformers for Qwen3-ASR...")
+    from transformers import AutoModelForMultimodalLM, AutoProcessor
+    from core.transcription.qwen3asr_core import Qwen3ASRModel
+
+    logger.info(f"Loading Qwen3-ASR from: {local_path}")
+    model = AutoModelForMultimodalLM.from_pretrained(local_path, dtype=torch_dtype)
+    model = model.to(device)
+    model.eval()
+    processor = AutoProcessor.from_pretrained(local_path)
+
+    logger.info(f"Qwen3-ASR model loaded successfully on {device}")
+    return Qwen3ASRModel(model, processor, device, torch_dtype)
+
+
 _MODEL_LOADERS = {
     "parakeet": _load_parakeet_model,
     "canary": _load_canary_model,
     "turboctc": _load_turboctc_model,
+    "qwen3asr": _load_qwen3asr_model,
 }
 
 

@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from config.server_settings import TranscriptionSettings
-from core.models.metadata import ModelMetadata
+from core.models.metadata import LANGUAGES, LANGUAGE_AUTO, ModelMetadata
 from core.transcription.dispatch import transcribe_audio
 
 logger = logging.getLogger(__name__)
@@ -197,11 +197,12 @@ class ServerTranscriptionWorker:
         self.cancel_event = cancel_event
 
     def transcribe(self, model, audio: np.ndarray) -> Dict[str, Any]:
-        text, segments = transcribe_audio(
+        text, segments, language = transcribe_audio(
             model, self.model_type, audio,
             segment_length=self._segment_length(),
             segment_duration=self.settings.segment_duration,
             include_timestamps=bool(self.settings.word_timestamps),
+            language=self.settings.language,
             cancel_check=self.cancel_event.is_set,
         )
         return {
@@ -210,6 +211,7 @@ class ServerTranscriptionWorker:
                 {"start": round(s, 3), "end": round(e, 3), "text": t}
                 for s, e, t in segments
             ],
+            "language": language,
         }
 
     def _segment_length(self) -> int:
@@ -303,12 +305,23 @@ def _build_settings(
     word_timestamps: Optional[bool],
     segment_length: Optional[int],
     segment_duration: Optional[int],
+    language: Optional[str] = None,
 ) -> Tuple[TranscriptionSettings, Dict[str, Any]]:
     defaults = _state.default_settings
 
     model_key, model_info = _resolve_model_key(model_name, precision, device, defaults)
 
     family = ModelMetadata.get_family(model_info["name"])
+    device = device or defaults.device
+    if device == "cpu" and not family.cpu_allowed:
+        raise ValueError(f"{model_info['name']} runs on CUDA only, not on the CPU.")
+
+    resolved_language = ModelMetadata.resolve_language(language) if language else defaults.language
+    if resolved_language is None:
+        raise ValueError(
+            f"Unknown language: '{language}'. Use '{LANGUAGE_AUTO}' or one of: {', '.join(LANGUAGES)}"
+        )
+
     if segment_length:
         seg_len = int(segment_length)
     elif family.configurable_chunk_length:
@@ -322,13 +335,14 @@ def _build_settings(
 
     settings = TranscriptionSettings(
         model_key=model_key,
-        device=device or defaults.device,
+        device=device,
         segment_length=seg_len,
         segment_duration=seg_dur,
         output_format=output_format or defaults.output_format,
         word_timestamps=word_timestamps if word_timestamps is not None else defaults.word_timestamps,
         recursive=False,
         selected_extensions=[],
+        language=resolved_language,
     )
     return settings, model_info
 
@@ -345,6 +359,7 @@ class RawTranscribeRequest(BaseModel):
     word_timestamps: Optional[bool] = None
     segment_length: Optional[int] = None
     segment_duration: Optional[int] = None
+    language: Optional[str] = None
 
 
 def create_app() -> FastAPI:
@@ -377,8 +392,8 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Elegant Transcriber API",
         description=(
-            "Transcribe audio using NVIDIA NeMo models (Parakeet v2/v3, Canary-Qwen) "
-            "and IBM Granite Speech TurboCTC. "
+            "Transcribe audio using NVIDIA NeMo models (Parakeet v2/v3, Canary-Qwen), "
+            "IBM Granite Speech TurboCTC and Qwen3-ASR (0.6B/1.7B). "
             "Accepts audio files, numpy arrays, PyTorch tensors, raw PCM, "
             "and base64-encoded data."
         ),
@@ -435,6 +450,7 @@ def create_app() -> FastAPI:
         word_timestamps: Optional[bool] = Form(None),
         segment_length: Optional[int] = Form(None),
         segment_duration: Optional[int] = Form(None),
+        language: Optional[str] = Form(None),
     ):
         try:
             data = await audio.read()
@@ -459,7 +475,7 @@ def create_app() -> FastAPI:
         try:
             settings, model_info = _build_settings(
                 model, precision, device, output_format,
-                word_timestamps, segment_length, segment_duration,
+                word_timestamps, segment_length, segment_duration, language,
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -510,7 +526,7 @@ def create_app() -> FastAPI:
             settings, model_info = _build_settings(
                 request.model, request.precision, request.device,
                 request.output_format, request.word_timestamps,
-                request.segment_length, request.segment_duration,
+                request.segment_length, request.segment_duration, request.language,
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))

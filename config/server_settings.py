@@ -14,3 +14,4 @@ class TranscriptionSettings:
     word_timestamps: bool
     recursive: bool = False
     selected_extensions: List[str] = field(default_factory=list)
+    language: str = "en"

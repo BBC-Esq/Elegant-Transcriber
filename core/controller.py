@@ -74,14 +74,16 @@ class TranscriberController(QObject):
             segment_length=config_manager.get_value("segment_length", 90),
             segment_duration=config_manager.get_value("segment_duration", 10),
             include_timestamps=config_manager.get_value("include_timestamps", False),
+            language=config_manager.get_value("language", "en"),
         )
 
     def set_parakeet_params(self, segment_length: int, segment_duration: int,
-                             include_timestamps: bool) -> None:
+                             include_timestamps: bool, language: str = "en") -> None:
         self.transcription_service.set_parakeet_params(
             segment_length=segment_length,
             segment_duration=segment_duration,
             include_timestamps=include_timestamps,
+            language=language,
         )
 
     def set_audio_device(self, device_id: int | None) -> None:
@@ -193,6 +195,7 @@ class TranscriberController(QObject):
             include_timestamps=include_timestamps,
             model_type=model_type,
             curate_enabled=bool(config_manager.get_value("curate_transcription", True)),
+            language=config_manager.get_value("language", "en"),
         )
         self._batch_processor.progress.connect(self._on_batch_progress)
         self._batch_processor.completed.connect(self._on_batch_completed)

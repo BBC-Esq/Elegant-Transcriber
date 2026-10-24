@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtWidgets import QMessageBox, QSpinBox as _QSpinBox
 
-from core.models.metadata import ModelMetadata
+from core.models.metadata import LANGUAGES, LANGUAGE_AUTO, ModelMetadata
 from core.audio.device_utils import get_input_devices
 from gui.styles import update_button_property
 from gui.file_panel import FileTypesDialog, SUPPORTED_AUDIO_EXTENSIONS, ToggleSwitch
@@ -67,6 +67,16 @@ _CPU_DISABLED_TIP_DEFAULT = (
     "Switch to CUDA to use it.</qt>"
 )
 _CPU_DISABLED_TIPS = {"canary": _CANARY_CPU_DISABLED_TIP}
+_LANGUAGE_TIP = (
+    "<qt>Language spoken in the audio. Auto-detect<br>"
+    "lets Qwen3-ASR identify it by itself.</qt>"
+)
+_LANGUAGE_UNUSED_TIP = (
+    "<qt>Only the Qwen3-ASR models take a<br>"
+    "language setting. The other models are<br>"
+    "English only or detect the language<br>"
+    "by themselves.</qt>"
+)
 _FILE_TYPES_TIP = "Configure which audio/video file types to include in batch processing"
 
 
@@ -100,9 +110,11 @@ class SettingsDialog(QDialog):
         self.supported_precisions = supported_precisions
         self.current_settings = dict(current_settings)
         self.current_audio_device = current_audio_device or {"name": "", "hostapi": ""}
-        self.current_parakeet_settings = current_parakeet_settings or {
+        self.current_parakeet_settings = {
             "include_timestamps": False,
             "segment_duration": 10,
+            "language": "en",
+            **(current_parakeet_settings or {}),
         }
         self.current_server_settings = current_server_settings or {
             "server_mode_enabled": False,
@@ -196,6 +208,13 @@ class SettingsDialog(QDialog):
         self.segment_duration_spin.setSuffix(" s")
         self._seg_dur_caption = QLabel("Segment Duration")
         parakeet_form.addRow(self._seg_dur_caption, self.segment_duration_spin)
+
+        self.language_dropdown = QComboBox()
+        self.language_dropdown.addItem("Auto-detect", LANGUAGE_AUTO)
+        for code, language in LANGUAGES.items():
+            self.language_dropdown.addItem(language, code)
+        self._language_caption = QLabel("Language")
+        parakeet_form.addRow(self._language_caption, self.language_dropdown)
 
         right_column.addWidget(parakeet_group)
 
@@ -291,6 +310,7 @@ class SettingsDialog(QDialog):
         self.include_timestamps_cb.toggled.connect(self._check_for_changes)
         self.include_timestamps_cb.toggled.connect(self._update_segment_duration_enabled)
         self.segment_duration_spin.valueChanged.connect(self._check_for_changes)
+        self.language_dropdown.currentIndexChanged.connect(self._check_for_changes)
         self.server_mode_toggle.toggled.connect(self._check_for_changes)
         self.server_mode_toggle.toggled.connect(self._apply_server_mode_lock)
         self.server_port_spin.valueChanged.connect(self._check_for_changes)
@@ -311,6 +331,10 @@ class SettingsDialog(QDialog):
         )
         current_seg_dur = int(self.current_parakeet_settings.get("segment_duration", 10))
         self.segment_duration_spin.setValue(current_seg_dur)
+        language_idx = self.language_dropdown.findData(self.current_parakeet_settings.get("language", "en"))
+        self.language_dropdown.setCurrentIndex(
+            language_idx if language_idx >= 0 else self.language_dropdown.findData("en")
+        )
         self._update_model_dependent_widgets()
 
         self.server_mode_toggle.blockSignals(True)
@@ -429,6 +453,12 @@ class SettingsDialog(QDialog):
         self.chunk_length_label.setToolTip(chunk_tip)
         self._chunk_caption.setToolTip(chunk_tip)
 
+        supports_language = ModelMetadata.supports_language(name)
+        language_tip = _LANGUAGE_TIP if supports_language else _LANGUAGE_UNUSED_TIP
+        self.language_dropdown.setEnabled(supports_language)
+        self.language_dropdown.setToolTip(language_tip)
+        self._language_caption.setToolTip(language_tip)
+
         if not ModelMetadata.supports_timestamps(name):
             no_ts_tip = _NO_TIMESTAMPS_TIP.format(model=name)
             self.include_timestamps_cb.blockSignals(True)
@@ -479,6 +509,7 @@ class SettingsDialog(QDialog):
         current = {
             "include_timestamps": self._timestamps_pref,
             "segment_duration": self.segment_duration_spin.value(),
+            "language": self.language_dropdown.currentData(),
         }
         return current != self.current_parakeet_settings
 
@@ -500,7 +531,7 @@ class SettingsDialog(QDialog):
         locked = [
             self.model_dropdown, self.device_dropdown, self.precision_dropdown,
             self.audio_device_dropdown, self.include_timestamps_cb,
-            self.segment_duration_spin, self._file_types_btn,
+            self.segment_duration_spin, self.language_dropdown, self._file_types_btn,
         ]
         for w in locked:
             w.setEnabled(not server_on)
@@ -614,6 +645,7 @@ class SettingsDialog(QDialog):
             settings = {
                 "include_timestamps": self._timestamps_pref,
                 "segment_duration": self.segment_duration_spin.value(),
+                "language": self.language_dropdown.currentData(),
             }
             self.parakeet_settings_changed.emit(settings)
 

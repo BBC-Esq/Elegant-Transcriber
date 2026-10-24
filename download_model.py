@@ -12,6 +12,8 @@ MODELS = {
     "nvidia/parakeet-tdt-0.6b-v3": "parakeet-tdt-0.6b-v3.nemo",
     "nvidia/canary-qwen-2.5b": None,
     "ibm-granite/granite-speech-5.0-470m-turboctc": None,
+    "Qwen/Qwen3-ASR-0.6B-hf": None,
+    "Qwen/Qwen3-ASR-1.7B-hf": None,
 }
 
 SNAPSHOT_REQUIRED_FILES = {
@@ -20,10 +22,20 @@ SNAPSHOT_REQUIRED_FILES = {
         "config.json", "generation_config.json", "model.safetensors",
         "processor_config.json", "tokenizer.json", "tokenizer_config.json",
     ),
+    "Qwen/Qwen3-ASR-0.6B-hf": (
+        "chat_template.jinja", "config.json", "generation_config.json", "model.safetensors",
+        "processor_config.json", "tokenizer.json", "tokenizer_config.json",
+    ),
+    "Qwen/Qwen3-ASR-1.7B-hf": (
+        "chat_template.jinja", "config.json", "generation_config.json", "model.safetensors",
+        "processor_config.json", "tokenizer.json", "tokenizer_config.json",
+    ),
 }
 
 REVISIONS = {
     "ibm-granite/granite-speech-5.0-470m-turboctc": "1dd23f46f6d4e6eae2531982ba2e33220086dd97",
+    "Qwen/Qwen3-ASR-0.6B-hf": "7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c",
+    "Qwen/Qwen3-ASR-1.7B-hf": "bcd2b5b7f32b480ab5790554cfa8347f246a14f3",
 }
 
 

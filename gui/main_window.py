@@ -707,6 +707,7 @@ class MainWindow(QMainWindow):
         parakeet_settings = {
             "include_timestamps": config_manager.get_value("include_timestamps", False),
             "segment_duration": config_manager.get_value("segment_duration", 10),
+            "language": config_manager.get_value("language", "en"),
         }
         server_settings = {
             "server_mode_enabled": self._server_mode_enabled,
@@ -750,6 +751,7 @@ class MainWindow(QMainWindow):
             segment_duration=int(config_manager.get_value("segment_duration", 10)),
             output_format=config_manager.get_value("output_format", "txt"),
             word_timestamps=bool(config_manager.get_value("include_timestamps", False)),
+            language=config_manager.get_value("language", "en"),
         )
 
     @Slot(bool, int)
@@ -903,6 +905,7 @@ class MainWindow(QMainWindow):
             segment_length=config_manager.get_value("segment_length", 90),
             segment_duration=settings.get("segment_duration", 10),
             include_timestamps=settings.get("include_timestamps", False),
+            language=settings.get("language", "en"),
         )
 
     def _on_file_types_changed(self, ext_checked: dict) -> None:
