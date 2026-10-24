@@ -55,39 +55,21 @@ python main.py
 ## Benchmarks (GPU)
 * ~2.5 hour audio file here: [`sam_altman_lex_podcast_367.flac`](https://huggingface.co/datasets/reach-vb/random-audios/blob/main/sam_altman_lex_podcast_367.flac)
 
-| Library | Model | Batch | Chunk | VRAM Usage | Time | Real Time | [Quality Ranking](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard) |
-|---|---|---|---|---|---|---|---|
-| **[Elegant Transcriber (NeMo)](https://github.com/BBC-Esq/Elegant-Audio-Transcriber)** | **[Parakeet TDT 0.6B v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2)** | 1 | **90s** | **~2.3 GB** | **14.9s** | 580x | #8 |
-| [Transformers](https://github.com/huggingface/transformers) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~12.4 GB | 52.2s | 166x | #32 |
-| [WhisperS2T Reborn (Ctranslate2)](https://github.com/BBC-Esq/whisper-s2t-reborn) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~13.4 GB | 66.9s | 129x | #32 |
-| [Faster-Whisper (Ctranslate2)](https://github.com/SYSTRAN/faster-whisper) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~12.5 GB | 75.9s | 114x | #32 |
-| [WhisperX (Ctranslate2)](https://github.com/m-bain/whisperX) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 32 | Default | ~12.8 GB | 71.8s | 120x | #32 |
-| [Transformers](https://github.com/huggingface/transformers) | [Granite 4.0 1B Speech](https://huggingface.co/ibm-granite/granite-4.0-1b-speech) | 12 | 30s | ~6.3 GB | 97.7s | 88x | #1 |
-| [Elegant Transcriber (NeMo)](https://github.com/BBC-Esq/Elegant-Audio-Transcriber) | [Canary-Qwen-2.5b](https://huggingface.co/nvidia/canary-qwen-2.5b) | 1 | 40s | ~5.9 GB | 639.8ss | 13.5x | #2 |
+| Library | Model | Chunk | VRAM Usage | Real Time | WER |
+|---|---|---|---|---|---|
+| [Transformers](https://github.com/huggingface/transformers) | [Granite Speech 5.0 470M TurboCTC](https://huggingface.co/ibm-granite/granite-speech-5.0-470m-turboctc) | 45s | ~1.4 GB | 1,949x | 3.53% |
+| [NeMo](https://github.com/NVIDIA/NeMo) | [Parakeet TDT 0.6B v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) | 90s | ~2.4 GB | 729x | 3.34% |
+| [NeMo](https://github.com/NVIDIA/NeMo) | [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) | 90s | ~2.4 GB | 703x | 3.66% |
+| [Transformers](https://github.com/huggingface/transformers) | [Qwen3-ASR 1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf) | 120s | ~5.5 GB | 14.2x | 2.23% |
+| [Transformers](https://github.com/huggingface/transformers) | [Qwen3-ASR 0.6B](https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf) | 120s | ~3.2 GB | 14.1x | 2.73% |
+| [NeMo](https://github.com/NVIDIA/NeMo) | [Canary-Qwen 2.5B](https://huggingface.co/nvidia/canary-qwen-2.5b) | 40s | ~5.8 GB | 12.3x | 2.92% |
 
-> All models were run in ```bfloat16```.<br>
+> All models were run in ```bfloat16``` on an RTX 4090 with Elegant Transcriber's default settings for each model.<br>
 > All VRAM measurements include model weights and inference overhead and subtract background usage.<br>
-> All parameters were chosen to achieve a maximum throughput of ~90% CUDA core usage on an RTX 4090.
-
-## Benchmarks (CPU)
-* ~13 minute private audio file.
-* CPU tests use a shorter audio sample to keep runtimes manageable.
-
-| Library | Model | Batch | Chunk | RAM Usage | Time | Real Time | [Quality Ranking](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard) |
-|---|---|---|---|---|---|---|---|
-| **[Elegant Transcriber](https://github.com/BBC-Esq/Elegant-Audio-Transcriber)** | **[Parakeet TDT 0.6B v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2)** | 1 | **90s** | **~5.6 GB** | **29.0s** | **26.8x** | #8 |
-| [Faster-Whisper (Ctranslate2)](https://github.com/SYSTRAN/faster-whisper) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 1 | Default | ~6.5 GB | 211.8s | 3.67x | #32 |
-| [WhisperS2T Reborn (Ctranslate2)](https://github.com/BBC-Esq/whisper-s2t-reborn) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 1 | Default | ~6.6 GB | 257.9s | 3.02x | #32 |
-| [Transformers](https://github.com/huggingface/transformers) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 1 | Default | ~6.6 GB | 311.1s | 2.50x | #32 |
-| [Elegant Transcriber (NeMo)](https://github.com/BBC-Esq/Elegant-Audio-Transcriber) | [Canary-Qwen-2.5b](https://huggingface.co/nvidia/canary-qwen-2.5b) | 1 | 40s | ~11.1 GB | 370.1ss | 2.1x | #2 |
-| [WhisperX (Ctranslate2)](https://github.com/m-bain/whisperX) | [Whisper Large v3](https://huggingface.co/openai/whisper-large-v3) | 1 | Default | ~7.3 GB | 396.4s | 1.96x | #32 |
-
-> All models were loaded in ```float32``` for CPU compatibility.<br>
-> 20 threads were used on an Intel 13900k resulting in ~90% CPU usage.<br>
-> I couldn't get Granite Speech to run...
+> WER (word error rate) was measured on 15 long English recordings totaling 1 hour 45 minutes; lower is better.
 
 ## Special Thanks
-* Nvidia for the Parkeet models, which are hands down the best balance of accuracy and compute time for most people IMHO.
-* IBM for Granite Speech Models, which, as of March, 2026, rank #1 on the ASR leaderboard in terms of accuracy.  Granite Speech 5.0 470M TurboCTC is now included, and it's the fastest model in the program.
+* NVIDIA for the Parakeet and Canary-Qwen models. Parakeet is hands down the best balance of accuracy and compute time for most people IMHO.
+* IBM for the Granite Speech models, including Granite Speech 5.0 470M TurboCTC, the fastest model in the program.
 * Alibaba's Qwen team for the Qwen3-ASR models, the most accurate in the program, covering 30 languages.
 * OpenAI for the older Whisper models setting the gold standard for so many years.
