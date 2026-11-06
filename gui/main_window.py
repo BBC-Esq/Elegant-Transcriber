@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Slot, QRect, QEvent, Signal, QSettings, QByteArray, QTimer, QSize
+from PySide6.QtCore import Qt, Slot, QRect, QEvent, Signal, QByteArray, QTimer, QSize
 from PySide6.QtGui import QIcon, QPixmap, QPainter
 from PySide6.QtWidgets import (
     QApplication,
@@ -28,6 +28,7 @@ from core.output.writers import write_output
 from core.monitoring.collectors import MetricsCollector
 from core.server.server_manager import ServerManager
 from config.manager import config_manager
+from config.ui_settings import open_ui_settings
 from config.server_settings import TranscriptionSettings as ServerTranscriptionSettings
 from gui.styles import update_button_property
 from gui.clipboard_window import ClipboardSideWindow
@@ -183,7 +184,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Elegant Recorder")
 
-        self.settings = QSettings("ElegantRecorder", "Recorder")
+        self.settings = open_ui_settings()
 
         self.loaded_model_settings = config_manager.get_model_settings()
         audio_device_id = self._resolve_audio_device()

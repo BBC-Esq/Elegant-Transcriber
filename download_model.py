@@ -6,6 +6,8 @@ os.environ["HF_HUB_DISABLE_XET"] = "1"
 
 from huggingface_hub import hf_hub_download, snapshot_download
 
+from utils import get_data_dir
+
 
 MODELS = {
     "nvidia/parakeet-tdt-0.6b-v2": "parakeet-tdt-0.6b-v2.nemo",
@@ -40,7 +42,37 @@ REVISIONS = {
 
 
 def get_models_dir() -> Path:
-    return Path(__file__).parent / "models"
+    return Path(get_data_dir()) / "models"
+
+
+def migrate_legacy_models() -> tuple[list[str], list[str]]:
+    legacy = Path(__file__).parent / "models"
+    target = get_models_dir()
+    moved, left = [], []
+    if not legacy.is_dir() or legacy.resolve() == target.resolve():
+        return moved, left
+    for org_dir in [d for d in legacy.iterdir() if d.is_dir()]:
+        for model_dir in [d for d in org_dir.iterdir() if d.is_dir()]:
+            name = f"{org_dir.name}/{model_dir.name}"
+            dest = target / org_dir.name / model_dir.name
+            if dest.exists():
+                left.append(name)
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                os.replace(model_dir, dest)
+                moved.append(name)
+            except OSError:
+                left.append(name)
+        try:
+            org_dir.rmdir()
+        except OSError:
+            pass
+    try:
+        legacy.rmdir()
+    except OSError:
+        pass
+    return moved, left
 
 
 def is_snapshot_complete(repo_id: str, path: Path) -> bool:

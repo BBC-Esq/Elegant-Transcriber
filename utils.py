@@ -1,6 +1,8 @@
 import os
 import sys
 
+APP_FOLDER_NAME = "Elegant Transcriber"
+
 
 def get_resource_path(relative_path: str) -> str:
     if getattr(sys, 'frozen', False):
@@ -9,6 +11,16 @@ def get_resource_path(relative_path: str) -> str:
         base_path = os.path.dirname(os.path.abspath(__file__))
 
     return os.path.join(base_path, relative_path)
+
+
+def get_settings_dir() -> str:
+    base = os.environ.get("APPDATA") or os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base, APP_FOLDER_NAME)
+
+
+def get_data_dir() -> str:
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("XDG_DATA_HOME") or os.path.join(os.path.expanduser("~"), ".local", "share")
+    return os.path.join(base, f"{APP_FOLDER_NAME} Data")
 
 
 def get_install_dir() -> str:

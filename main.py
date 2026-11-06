@@ -110,6 +110,18 @@ def _configure_torch_threads(logger) -> None:
         logger.warning(f"Failed to configure torch threads: {e}")
 
 
+def _migrate_legacy_models(logger) -> None:
+    try:
+        from download_model import get_models_dir, migrate_legacy_models
+        moved, left = migrate_legacy_models()
+        if moved:
+            logger.info(f"Moved downloaded models to {get_models_dir()}: {', '.join(moved)}")
+        if left:
+            logger.warning(f"Left models in the old program folder (already present or on another drive): {', '.join(left)}")
+    except Exception as e:
+        logger.warning(f"Could not move downloaded models to the new folder: {e}")
+
+
 def run_gui() -> None:
     log_file = setup_logging()
     logger = get_logger(__name__)
@@ -118,6 +130,7 @@ def run_gui() -> None:
     logger.info(f"CUDA paths configured: {_cuda_paths_configured}")
 
     _configure_torch_threads(logger)
+    _migrate_legacy_models(logger)
 
     sys.excepthook = _global_exception_handler
 
