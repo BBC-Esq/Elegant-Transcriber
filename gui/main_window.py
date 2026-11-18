@@ -1115,13 +1115,21 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Unsupported File", "Please select a supported audio file.")
             return
 
-        self._pending_output_mode = "clipboard"
-        self._pending_output_format = "txt"
-        self._pending_output_dir = ""
+        output_mode, output_format, output_dir = self.file_panel.get_output_selection()
+        if output_mode == "save_to_custom" and not output_dir:
+            QMessageBox.warning(self, "No Directory", "Please select an output directory first.")
+            return
+
+        self._pending_output_mode = output_mode
+        self._pending_output_format = output_format
+        self._pending_output_dir = output_dir
         self._pending_source_file = file_path
 
-        logger.info(f"Transcribing dropped file: {file_path}")
-        self.controller.transcribe_file(file_path)
+        logger.info(f"Transcribing dropped file: {file_path} (mode={output_mode}, fmt={output_format})")
+        self.controller.transcribe_file(
+            file_path,
+            include_timestamps=True if output_format in ("srt", "vtt") else None,
+        )
 
     @Slot()
     def _toggle_clipboard(self) -> None:

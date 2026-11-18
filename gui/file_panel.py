@@ -359,6 +359,11 @@ class FilePanelWindow(QWidget):
             if txt_idx >= 0:
                 self._format_combo.setCurrentIndex(txt_idx)
 
+    def get_output_selection(self) -> tuple[str, str, str]:
+        mode = OUTPUT_MODES[self._output_mode.currentIndex()][1]
+        output_dir = self._custom_output_dir if mode == "save_to_custom" else ""
+        return mode, self._format_combo.currentText(), output_dir
+
     def get_panel_state(self) -> dict:
         return {
             "multi_mode": self._mode_toggle.isChecked(),
