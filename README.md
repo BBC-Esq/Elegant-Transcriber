@@ -26,6 +26,8 @@
 - Works on GPU (CUDA) and CPU, Windows or Linux (the CPU runs the Parakeet and Granite TurboCTC models)
 - Supported file types: AAC, AMR, ASF, AVI, FLAC, M4A, MKV, MP3, MP4, WAV, WEBM, WMA
 
+**Optional local English model.** In Settings, select CUDA and **Oruk Fourier 2B** to download the 4.1 GB native checkpoint. It produces plain text. The weights are licensed [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) and attributed to [Oruk](https://huggingface.co/oruk/oruk-fourier-2b). Oruk requires separate permission for hosted/API and commercial use. This integration is available in the desktop app.
+
 ## Installation
 
 > GPU mode needs an NVIDIA GeForce GTX 16 / RTX 20 series card or newer, with driver version 580 or newer. Other computers can run it on the CPU.

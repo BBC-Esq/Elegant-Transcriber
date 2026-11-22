@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, List
 
 
@@ -9,6 +9,8 @@ CANARY_CHUNK_LENGTH = 40
 TURBOCTC_CHUNK_LENGTH = 45
 QWEN3_CHUNK_LENGTH = 120
 QWEN3_MAX_CHUNK_LENGTH = 1200
+
+FOURIER_MODEL_ID = "oruk/oruk-fourier-2b"
 
 LANGUAGE_AUTO = "auto"
 LANGUAGES: Dict[str, str] = {
@@ -54,6 +56,7 @@ class ModelFamily:
     cpu_allowed: bool
     configurable_chunk_length: bool = False
     supports_language: bool = False
+    fixed_language: str | None = None
 
 
 FAMILIES: Dict[str, ModelFamily] = {
@@ -75,6 +78,8 @@ FAMILIES: Dict[str, ModelFamily] = {
     ),
 }
 
+FAMILIES["fourier"] = replace(FAMILIES["qwen3asr"], supports_language=False, fixed_language="en")
+
 
 @dataclass
 class ModelInfo:
@@ -84,6 +89,7 @@ class ModelInfo:
     model_type: str = "parakeet"
     precisions: list[str] = field(default_factory=lambda: ["bfloat16", "float16", "float32"])
     vram: dict[str, str] = field(default_factory=dict)
+    server_allowed: bool = True
 
 
 class ModelMetadata:
@@ -146,6 +152,16 @@ class ModelMetadata:
             ),
             model_type="qwen3asr",
             vram={"bfloat16": "~6.3 GB", "float16": "~6.3 GB", "float32": "~11 GB"},
+        ),
+        ModelInfo(
+            name="Oruk Fourier 2B",
+            model_id=FOURIER_MODEL_ID,
+            description=(
+                "English-only local transcription on CUDA. Text output without timestamps. "
+                "4.1 GB download from Oruk. Weights: CC BY-NC 4.0, noncommercial use."
+            ),
+            model_type="fourier",
+            server_allowed=False,
         ),
     ]
 
@@ -232,9 +248,11 @@ class ModelMetadata:
         return options
 
     @classmethod
-    def get_all_models_with_precisions(cls) -> Dict[str, Dict[str, object]]:
+    def get_all_models_with_precisions(cls, *, server_only: bool = False) -> Dict[str, Dict[str, object]]:
         result: Dict[str, Dict[str, object]] = {}
         for m in cls._MODELS:
+            if server_only and not m.server_allowed:
+                continue
             for prec in m.precisions:
                 key = f"{m.name} - {prec}"
                 result[key] = {

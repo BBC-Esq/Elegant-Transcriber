@@ -38,7 +38,10 @@ _CHUNK_TIP_CANARY = (
     "Canary's attention context is capped<br>"
     "lower than Parakeet's.</qt>"
 )
-_CHUNK_TIPS = {"canary": _CHUNK_TIP_CANARY}
+_CHUNK_TIPS = {
+    "canary": _CHUNK_TIP_CANARY,
+    "fourier": "<qt>Uses the Qwen3-ASR engine's 120-second chunks.</qt>",
+}
 _SEG_DUR_TIP_DEFAULT = (
     "<qt>When timestamps are enabled, word-level<br>"
     "timings are grouped into segments with a<br>"
@@ -453,11 +456,19 @@ class SettingsDialog(QDialog):
         self.chunk_length_label.setToolTip(chunk_tip)
         self._chunk_caption.setToolTip(chunk_tip)
 
+        fixed_language = ModelMetadata.get_family(name).fixed_language
+        self.language_dropdown.setVisible(fixed_language is None)
+        self._language_caption.setText(f"Language: {LANGUAGES[fixed_language]}" if fixed_language else "Language")
         supports_language = ModelMetadata.supports_language(name)
         language_tip = _LANGUAGE_TIP if supports_language else _LANGUAGE_UNUSED_TIP
         self.language_dropdown.setEnabled(supports_language)
         self.language_dropdown.setToolTip(language_tip)
         self._language_caption.setToolTip(language_tip)
+
+        info = ModelMetadata.get_model_info(name)
+        can_serve = info is None or info.server_allowed
+        self.server_mode_toggle.setEnabled(can_serve or self.server_mode_toggle.isChecked())
+        self.server_mode_toggle.setToolTip("" if can_serve else "Select a server-compatible model to enable Server Mode.")
 
         if not ModelMetadata.supports_timestamps(name):
             no_ts_tip = _NO_TIMESTAMPS_TIP.format(model=name)
@@ -483,6 +494,11 @@ class SettingsDialog(QDialog):
 
     def _update_segment_duration_enabled(self) -> None:
         name = self.model_dropdown.currentText()
+        info = ModelMetadata.get_model_info(name)
+        can_serve = info is None or info.server_allowed
+        self.server_mode_toggle.setEnabled(can_serve or self.server_mode_toggle.isChecked())
+        self.server_mode_toggle.setToolTip("" if can_serve else "Select a server-compatible model to enable Server Mode.")
+
         if not ModelMetadata.supports_timestamps(name):
             self.segment_duration_spin.setEnabled(False)
             return

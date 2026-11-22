@@ -22,6 +22,7 @@ _TEXT_TRANSCRIBERS = {
     "canary": transcribe_canary,
     "turboctc": transcribe_turboctc,
     "qwen3asr": transcribe_qwen3asr,
+    "fourier": transcribe_qwen3asr,
 }
 
 _TIMESTAMP_TRANSCRIBERS = {
@@ -52,11 +53,12 @@ def transcribe_audio(
         )
         return " ".join(t for _, _, t in segments), segments, None
     transcribe = _TEXT_TRANSCRIBERS.get(model_type, transcribe_text)
-    if ModelMetadata.get_family_for_type(model_type).supports_language:
+    family = ModelMetadata.get_family_for_type(model_type)
+    if family.fixed_language or family.supports_language:
         text, reported_language = transcribe(
             model, audio,
             segment_length=segment_length,
-            language=language,
+            language=family.fixed_language or language,
             cancel_check=cancel_check,
             progress_callback=progress_callback,
         )
