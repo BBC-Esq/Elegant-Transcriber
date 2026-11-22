@@ -494,11 +494,6 @@ class SettingsDialog(QDialog):
 
     def _update_segment_duration_enabled(self) -> None:
         name = self.model_dropdown.currentText()
-        info = ModelMetadata.get_model_info(name)
-        can_serve = info is None or info.server_allowed
-        self.server_mode_toggle.setEnabled(can_serve or self.server_mode_toggle.isChecked())
-        self.server_mode_toggle.setToolTip("" if can_serve else "Select a server-compatible model to enable Server Mode.")
-
         if not ModelMetadata.supports_timestamps(name):
             self.segment_duration_spin.setEnabled(False)
             return
