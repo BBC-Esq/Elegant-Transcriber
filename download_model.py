@@ -6,6 +6,7 @@ os.environ["HF_HUB_DISABLE_XET"] = "1"
 
 from huggingface_hub import hf_hub_download, snapshot_download
 
+from core.models.metadata import FOURIER_MODEL_ID
 from utils import get_data_dir
 
 
@@ -16,7 +17,16 @@ MODELS = {
     "ibm-granite/granite-speech-5.0-470m-turboctc": None,
     "Qwen/Qwen3-ASR-0.6B-hf": None,
     "Qwen/Qwen3-ASR-1.7B-hf": None,
+    FOURIER_MODEL_ID: None,
 }
+
+QWEN_SNAPSHOT_FILES = (
+    "chat_template.jinja", "config.json", "generation_config.json", "model.safetensors",
+    "processor_config.json", "tokenizer.json", "tokenizer_config.json",
+)
+
+# Fourier also publishes GGUF and ONNX variants. Only fetch its native checkpoint.
+SNAPSHOT_ALLOWLISTS = {FOURIER_MODEL_ID: QWEN_SNAPSHOT_FILES}
 
 SNAPSHOT_REQUIRED_FILES = {
     "nvidia/canary-qwen-2.5b": ("config.json", "model.safetensors"),
@@ -24,17 +34,13 @@ SNAPSHOT_REQUIRED_FILES = {
         "config.json", "generation_config.json", "model.safetensors",
         "processor_config.json", "tokenizer.json", "tokenizer_config.json",
     ),
-    "Qwen/Qwen3-ASR-0.6B-hf": (
-        "chat_template.jinja", "config.json", "generation_config.json", "model.safetensors",
-        "processor_config.json", "tokenizer.json", "tokenizer_config.json",
-    ),
-    "Qwen/Qwen3-ASR-1.7B-hf": (
-        "chat_template.jinja", "config.json", "generation_config.json", "model.safetensors",
-        "processor_config.json", "tokenizer.json", "tokenizer_config.json",
-    ),
+    "Qwen/Qwen3-ASR-0.6B-hf": QWEN_SNAPSHOT_FILES,
+    "Qwen/Qwen3-ASR-1.7B-hf": QWEN_SNAPSHOT_FILES,
+    FOURIER_MODEL_ID: QWEN_SNAPSHOT_FILES,
 }
 
 REVISIONS = {
+    FOURIER_MODEL_ID: "8c2a8871f1304aa2f634da4fb95e24438c4945b9",
     "ibm-granite/granite-speech-5.0-470m-turboctc": "1dd23f46f6d4e6eae2531982ba2e33220086dd97",
     "Qwen/Qwen3-ASR-0.6B-hf": "7f1569a48a89f3e3f4dc3a5c9d28bddd903bc76c",
     "Qwen/Qwen3-ASR-1.7B-hf": "bcd2b5b7f32b480ab5790554cfa8347f246a14f3",
@@ -145,6 +151,7 @@ def download_model(repo_id: str) -> str:
         repo_id=repo_id,
         local_dir=str(local_path),
         revision=REVISIONS.get(repo_id),
+        allow_patterns=SNAPSHOT_ALLOWLISTS.get(repo_id),
     )
 
     if is_snapshot_complete(repo_id, local_path):

@@ -278,7 +278,7 @@ def _resolve_model_key(
     device: Optional[str],
     defaults: TranscriptionSettings,
 ) -> Tuple[str, Dict[str, Any]]:
-    registry = ModelMetadata.get_all_models_with_precisions()
+    registry = ModelMetadata.get_all_models_with_precisions(server_only=True)
     default_info = registry.get(defaults.model_key, {})
     target_name = model_name or default_info.get("name", "")
     target_prec = precision if precision else default_info.get("precision", "")
@@ -415,7 +415,7 @@ def create_app() -> FastAPI:
 
     @app.get("/models")
     async def models():
-        registry = ModelMetadata.get_all_models_with_precisions()
+        registry = ModelMetadata.get_all_models_with_precisions(server_only=True)
         result = {}
         for key, info in registry.items():
             result[key] = {

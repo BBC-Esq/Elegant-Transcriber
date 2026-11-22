@@ -22,7 +22,7 @@ class _NullWriter:
 from core.logging_config import get_logger
 from core.exceptions import ModelLoadError
 from core.models.metadata import ModelMetadata
-from download_model import find_local_model, get_local_model_path, is_snapshot_complete, MODELS, REVISIONS
+from download_model import find_local_model, get_local_model_path, is_snapshot_complete, MODELS, REVISIONS, SNAPSHOT_ALLOWLISTS
 
 logger = get_logger(__name__)
 
@@ -60,7 +60,9 @@ def _get_remote_download_size(model_id: str) -> int:
             model_id, repo_type="model", revision=REVISIONS.get(model_id), files_metadata=True
         )
         sizes = {sibling.rfilename: int(sibling.size or 0) for sibling in info.siblings}
-        return sizes.get(filename, 0) if filename else sum(sizes.values())
+        if filename:
+            return sizes.get(filename, 0)
+        return sum(sizes.get(name, 0) for name in SNAPSHOT_ALLOWLISTS.get(model_id, sizes))
     except Exception as e:
         logger.debug(f"Could not get remote size for {model_id}: {e}")
     return 0
@@ -166,6 +168,7 @@ _MODEL_LOADERS = {
     "canary": _load_canary_model,
     "turboctc": _load_turboctc_model,
     "qwen3asr": _load_qwen3asr_model,
+    "fourier": _load_qwen3asr_model,
 }
 
 
@@ -191,7 +194,8 @@ def _download_model_sync(model_id: str) -> str:
         return str(local_path)
 
     local_path.mkdir(parents=True, exist_ok=True)
-    snapshot_download(repo_id=model_id, local_dir=str(local_path), revision=revision)
+    snapshot_download(repo_id=model_id, local_dir=str(local_path), revision=revision,
+                      allow_patterns=SNAPSHOT_ALLOWLISTS.get(model_id))
     if not is_snapshot_complete(model_id, local_path):
         raise ModelLoadError(f"Download completed but required files are missing at {local_path}")
     return str(local_path)
@@ -367,6 +371,7 @@ class _ModelLoaderThread(QThread):
                 repo_id=model_id,
                 local_dir=str(local_path),
                 revision=revision,
+                allow_patterns=SNAPSHOT_ALLOWLISTS.get(model_id),
                 tqdm_class=_ProgressTqdm,
             )
         except InterruptedError:
@@ -376,6 +381,7 @@ class _ModelLoaderThread(QThread):
                 repo_id=model_id,
                 local_dir=str(local_path),
                 revision=revision,
+                allow_patterns=SNAPSHOT_ALLOWLISTS.get(model_id),
             )
 
         if not is_snapshot_complete(model_id, local_path):
